@@ -5,6 +5,7 @@ import { logger } from './utils/logger.js';
 import { loadSnapshots } from './market/candleStore.js';
 import { priceService } from './market/priceService.js';
 import { matcher } from './engine/matcher.js';
+import { startIngest, stopIngest } from './market/ingest.js';
 
 let server;
 
@@ -35,7 +36,10 @@ async function boot() {
   // 7. Start price service ticker (1 Hz)
   priceService.start();
 
-  // 8. Matcher subscribes to price service
+  // 8. Start ingest job
+  startIngest();
+
+  // 9. Matcher subscribes to price service
   matcher.subscribe(priceService);
 
   logger.info('Boot complete');
@@ -45,6 +49,7 @@ async function shutdown(signal) {
   logger.info({ signal }, 'Shutting down');
   try {
     priceService.stop();
+    stopIngest();
 
     await new Promise((resolve, reject) => {
       if (server) {
