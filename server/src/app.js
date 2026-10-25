@@ -7,8 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { healthRouter } from './routes/health.js';
 import { marketRouter } from './routes/market.js';
+import { authRouter } from './routes/auth.js';
+import { ordersRouter } from './routes/orders.js';
+import { portfolioRouter } from './routes/portfolio.js';
+import { accountRouter } from './routes/account.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { generalLimiter } from './middleware/rateLimits.js';
 import { env } from './config/env.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -55,10 +60,16 @@ export function createApp(_opts = {}) {
 
   app.use(express.json({ limit: '10kb' }));
   app.use(cookieParser());
+  app.use(generalLimiter);
 
   // API routes
   app.use('/api/health', healthRouter);
   app.use('/api/market', marketRouter);
+  app.use('/api/auth', authRouter);
+  app.use('/api/orders', ordersRouter);
+  app.use('/api/trades', ordersRouter); // /api/trades is a sub-resource of ordersRouter
+  app.use('/api/portfolio', portfolioRouter);
+  app.use('/api/account', accountRouter);
 
   if (env.NODE_ENV === 'production') {
     app.use(express.static(clientDist));

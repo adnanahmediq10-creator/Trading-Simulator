@@ -4,29 +4,39 @@ import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { loadSnapshots } from './market/candleStore.js';
 import { priceService } from './market/priceService.js';
+import { matcher } from './engine/matcher.js';
 
 let server;
-/** @type {import('http').Server} */
-let httpServer;
 
 async function boot() {
   // 1. Connect to MongoDB
   await connectDb();
 
-  // 2. Load committed snapshots into memory
+  // 2. Load committed snapshots into memory (weekend/offline safety net)
   await loadSnapshots();
 
-  // 3. Create Express app
+  // 3. Rebuild matcher index from DB (restart safety)
+  await matcher.rebuild();
+
+  // 4. Create Express app
   const app = createApp();
 
-  // 4. Start HTTP server
-  httpServer = app.listen(env.PORT, () => {
+  // 5. Start HTTP server
+  server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, 'HTTP server listening');
   });
-  server = httpServer;
 
-  // 5. Start price service ticker (1 Hz)
+  // 6. Wire Socket.IO (done in sockets/index.js)
+  const { initSocketIO } = await import('./sockets/index.js');
+  const io = initSocketIO(server);
+  app.set('io', io);
+  matcher.setIo(io);
+
+  // 7. Start price service ticker (1 Hz)
   priceService.start();
+
+  // 8. Matcher subscribes to price service
+  matcher.subscribe(priceService);
 
   logger.info('Boot complete');
 }
@@ -34,10 +44,8 @@ async function boot() {
 async function shutdown(signal) {
   logger.info({ signal }, 'Shutting down');
   try {
-    // Stop the price service
     priceService.stop();
 
-    // Close HTTP server
     await new Promise((resolve, reject) => {
       if (server) {
         server.close((err) => (err ? reject(err) : resolve()));
@@ -46,7 +54,6 @@ async function shutdown(signal) {
       }
     });
 
-    // Disconnect from DB
     await disconnectDb();
     logger.info('Shutdown complete');
     process.exit(0);
