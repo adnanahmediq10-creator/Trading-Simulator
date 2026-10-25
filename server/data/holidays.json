@@ -1,0 +1,4 @@
+{
+  "_comment": "Replace with official NSE trading holidays. Loader tolerates empty or placeholder dates.",
+  "holidays": []
+}
