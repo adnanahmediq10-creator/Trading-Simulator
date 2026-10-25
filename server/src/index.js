@@ -2,35 +2,57 @@ import { createApp } from './app.js';
 import { connectDb, disconnectDb } from './db.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { loadSnapshots } from './market/candleStore.js';
+import { priceService } from './market/priceService.js';
 
 let server;
+/** @type {import('http').Server} */
+let httpServer;
 
 async function boot() {
+  // 1. Connect to MongoDB
   await connectDb();
+
+  // 2. Load committed snapshots into memory
+  await loadSnapshots();
+
+  // 3. Create Express app
   const app = createApp();
-  server = app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT }, 'HTTP server listening');
+
+  // 4. Start HTTP server
+  httpServer = app.listen(env.PORT, () => {
+    logger.info({ port: env.PORT, env: env.NODE_ENV }, 'HTTP server listening');
   });
+  server = httpServer;
+
+  // 5. Start price service ticker (1 Hz)
+  priceService.start();
+
+  logger.info('Boot complete');
 }
 
-function shutdown(signal) {
+async function shutdown(signal) {
   logger.info({ signal }, 'Shutting down');
-  const done = async () => {
-    try {
-      await disconnectDb();
-      process.exit(0);
-    } catch (err) {
-      logger.error({ err }, 'Shutdown error');
-      process.exit(1);
-    }
-  };
+  try {
+    // Stop the price service
+    priceService.stop();
 
-  if (server) {
-    server.close(() => {
-      done();
+    // Close HTTP server
+    await new Promise((resolve, reject) => {
+      if (server) {
+        server.close((err) => (err ? reject(err) : resolve()));
+      } else {
+        resolve();
+      }
     });
-  } else {
-    done();
+
+    // Disconnect from DB
+    await disconnectDb();
+    logger.info('Shutdown complete');
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, 'Shutdown error');
+    process.exit(1);
   }
 }
 

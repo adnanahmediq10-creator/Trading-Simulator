@@ -1,30 +1,64 @@
 import { Router } from 'express';
 import { dbStateLabel } from '../db.js';
+import { priceService } from '../market/priceService.js';
+import {
+  getEffectiveMode,
+  getVirtualTime,
+  getHolidays,
+} from '../market/clock.js';
+import { env } from '../config/env.js';
 
 const startTime = Date.now();
 
 export const healthRouter = Router();
 
+/**
+ * @type {{ state: string, consecutiveFailures: number, lastSuccessAt: string|null, nextRetryAt: string|null }}
+ */
+let breakerState = {
+  state: 'CLOSED',
+  consecutiveFailures: 0,
+  lastSuccessAt: null,
+  nextRetryAt: null,
+};
+
+/** Called by ingest.js to update breaker state for the health endpoint */
+export function setBreakerState(state) {
+  breakerState = { ...breakerState, ...state };
+}
+
 healthRouter.get('/', (_req, res) => {
   const dbState = dbStateLabel();
-  const degraded = dbState !== 'connected';
+  const dbDown = dbState === 'disconnected';
 
-  res.status(degraded ? 503 : 200).json({
+  const nowMs = Date.now();
+  const holidays = getHolidays();
+  const modeInfo = getEffectiveMode(nowMs, holidays, true);
+  const { virtualNowMs, sessionEpoch } = getVirtualTime(nowMs, modeInfo, env.REPLAY_SPEED);
+
+  const tickerStatus = priceService.getStatus();
+  const dataSources = priceService.getDataSources();
+
+  const degraded = dbDown;
+
+  res.status(dbDown ? 503 : 200).json({
     status: degraded ? 'degraded' : 'ok',
     uptimeSec: Math.floor((Date.now() - startTime) / 1000),
     time: new Date().toISOString(),
+    mode: modeInfo.mode,
+    effectiveMode: modeInfo.effectiveMode ?? modeInfo.mode,
+    virtualNowMs,
+    sessionEpoch,
     db: { state: dbState },
-    ticker: { running: false, lastTickAgeMs: null },
-    ingest: {
-      enabled: false,
-      breaker: {
-        state: 'CLOSED',
-        consecutiveFailures: 0,
-        lastSuccessAt: null,
-        nextRetryAt: null,
-      },
+    ticker: {
+      running: tickerStatus.running,
+      lastTickAgeMs: tickerStatus.lastTickAgeMs,
     },
-    dataSources: {},
-    matcher: { pendingOrders: 0 },
+    ingest: {
+      enabled: env.INGEST_ENABLED,
+      breaker: breakerState,
+    },
+    dataSources,
+    matcher: { pendingOrders: 0 }, // updated by matcher.js after M7
   });
 });

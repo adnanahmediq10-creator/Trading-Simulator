@@ -2,9 +2,11 @@ import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
+import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { healthRouter } from './routes/health.js';
+import { marketRouter } from './routes/market.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { env } from './config/env.js';
@@ -26,10 +28,23 @@ export function createApp(_opts = {}) {
         useDefaults: true,
         directives: {
           'connect-src': ["'self'", 'ws:', 'wss:'],
+          'script-src': ["'self'"],
+          'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          'font-src': ["'self'", 'https://fonts.gstatic.com'],
         },
       },
     }),
   );
+
+  // CORS for dev only
+  if (env.NODE_ENV === 'development') {
+    app.use(
+      cors({
+        origin: env.CLIENT_ORIGIN,
+        credentials: true,
+      }),
+    );
+  }
 
   app.use(
     pinoHttp({
@@ -41,7 +56,9 @@ export function createApp(_opts = {}) {
   app.use(express.json({ limit: '10kb' }));
   app.use(cookieParser());
 
+  // API routes
   app.use('/api/health', healthRouter);
+  app.use('/api/market', marketRouter);
 
   if (env.NODE_ENV === 'production') {
     app.use(express.static(clientDist));
