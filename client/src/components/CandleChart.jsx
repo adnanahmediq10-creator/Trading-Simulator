@@ -14,7 +14,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { createChart } from 'lightweight-charts';
 import { toChartTime } from '../lib/time.js';
-import { formatINR } from '../lib/money.js';
 import { useTicks } from '../hooks/useTicks.js';
 import { useSocket } from '../hooks/useSocket.js';
 
@@ -387,27 +386,6 @@ export default function CandleChart({
     }
   }, [pendingOrders]);
 
-  // ── Fill markers from trades ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!seriesRef.current || !trades?.length) return;
-
-    const ivMs = INTERVAL_MS[interval] ?? INTERVAL_MS['1m'];
-    const markers = trades
-      .filter((t) => t.executedVts)
-      .map((t) => ({
-        time: toChartTime(Math.floor(t.executedVts / ivMs) * ivMs),
-        position: t.side === 'BUY' ? 'belowBar' : 'aboveBar',
-        color: t.side === 'BUY' ? '#22c55e' : '#ef4444',
-        shape: t.side === 'BUY' ? 'arrowUp' : 'arrowDown',
-        text: `${t.side[0]} ${t.qty} @ ${formatINR(t.pricePaise)}`,
-        size: 1,
-      }))
-      .sort((a, b) => a.time - b.time);
-
-    try {
-      seriesRef.current.setMarkers(markers);
-    } catch { /* ignore */ }
-  }, [trades, interval]);
 
   return (
     <div className="flex flex-col h-full">
