@@ -9,11 +9,13 @@ import { healthRouter } from './routes/health.js';
 import { marketRouter } from './routes/market.js';
 import { authRouter } from './routes/auth.js';
 import { ordersRouter } from './routes/orders.js';
+import { tradesRouter } from './routes/orders.js';
 import { portfolioRouter } from './routes/portfolio.js';
 import { accountRouter } from './routes/account.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimits.js';
+import { originCheck } from './middleware/originCheck.js';
 import { env } from './config/env.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,15 +64,19 @@ export function createApp(_opts = {}) {
   app.use(cookieParser());
   app.use(generalLimiter);
 
+  // CSRF origin check for mutating requests
+  app.use(originCheck);
+
   // API routes
   app.use('/api/health', healthRouter);
   app.use('/api/market', marketRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/orders', ordersRouter);
-  app.use('/api/trades', ordersRouter); // /api/trades is a sub-resource of ordersRouter
+  app.use('/api/trades', tradesRouter);
   app.use('/api/portfolio', portfolioRouter);
   app.use('/api/account', accountRouter);
 
+  // Production: serve built React app with SPA fallback
   if (env.NODE_ENV === 'production') {
     app.use(express.static(clientDist));
     app.get('*', (req, res, next) => {

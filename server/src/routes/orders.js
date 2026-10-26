@@ -115,6 +115,7 @@ ordersRouter.delete(
 );
 
 // ── GET /api/trades ───────────────────────────────────────────────────────────
+// Mounted separately at /api/trades via tradesRouter
 
 const tradeQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -122,27 +123,33 @@ const tradeQuerySchema = z.object({
   symbol: z.string().optional(),
 });
 
-ordersRouter.get(
-  '/trades',
-  asyncHandler(async (req, res) => {
-    const parsed = tradeQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      throw new DomainError('VALIDATION_ERROR', 'Invalid query', { status: 400 });
-    }
-    const { limit, cursor, symbol } = parsed.data;
-    const filter = { userId: req.userId };
-    if (symbol) filter.symbol = symbol;
-    if (cursor) filter._id = { $lt: cursor };
+async function handleListTrades(req, res) {
+  const parsed = tradeQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new DomainError('VALIDATION_ERROR', 'Invalid query', { status: 400 });
+  }
+  const { limit, cursor, symbol } = parsed.data;
+  const filter = { userId: req.userId };
+  if (symbol) filter.symbol = symbol;
+  if (cursor) filter._id = { $lt: cursor };
 
-    const trades = await Trade.find(filter)
-      .sort({ executedAt: -1 })
-      .limit(limit + 1)
-      .lean();
+  const trades = await Trade.find(filter)
+    .sort({ executedAt: -1 })
+    .limit(limit + 1)
+    .lean();
 
-    const hasMore = trades.length > limit;
-    const results = trades.slice(0, limit);
-    const nextCursor = hasMore ? String(results[results.length - 1]._id) : null;
+  const hasMore = trades.length > limit;
+  const results = trades.slice(0, limit);
+  const nextCursor = hasMore ? String(results[results.length - 1]._id) : null;
 
-    res.json({ trades: results, nextCursor, hasMore });
-  }),
-);
+  res.json({ trades: results, nextCursor, hasMore });
+}
+
+// Keep /api/orders/trades for backward compat
+ordersRouter.get('/trades', asyncHandler(handleListTrades));
+
+// Separate router for /api/trades
+export const tradesRouter = Router();
+tradesRouter.use(requireAuth);
+tradesRouter.get('/', asyncHandler(handleListTrades));
+
