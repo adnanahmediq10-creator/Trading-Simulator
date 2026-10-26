@@ -1,8 +1,8 @@
 /**
  * OrderPanel — place MARKET or LIMIT orders.
- * Props: { symbol, pricePaise, onSuccess }
+ * Props: { symbol, pricePaise, onSuccess, prefillSide, prefillQty, onPrefillConsumed }
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { v4 as uuid } from 'uuid';
 import { api } from '../lib/api.js';
@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth.js';
 import { formatINR, formatINRCompact, rupeesToPaise, isValidTick } from '../lib/money.js';
 import { useToast } from './Toasts.jsx';
 
-export default function OrderPanel({ symbol, pricePaise, onSuccess }) {
+export default function OrderPanel({ symbol, pricePaise, onSuccess, prefillSide, prefillQty, onPrefillConsumed }) {
   const { user } = useAuth();
   const toast = useToast();
   const qc = useQueryClient();
@@ -19,6 +19,17 @@ export default function OrderPanel({ symbol, pricePaise, onSuccess }) {
   const [qty, setQty] = useState('');
   const [limitPrice, setLimitPrice] = useState('');
   const [error, setError] = useState('');
+
+  // Consume prefill (e.g., from Sell shortcut in PositionsTable)
+  useEffect(() => {
+    if (prefillSide) {
+      setSide(prefillSide);
+      if (prefillQty) setQty(prefillQty);
+      setType('MARKET');
+      onPrefillConsumed?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillSide, prefillQty]);
 
   const buyingPower = user ? user.cashPaise - (user.reservedCashPaise ?? 0) : 0;
 
