@@ -4,13 +4,12 @@
  *  - Live 1-second tick updates
  *  - Pending limit order price lines
  *  - Position avg-cost line with live P&L overlay + quick-exit button
- *  - Fill markers from trade history
  *  - Interval selector (1m, 5m, 15m, 1D)
  *  - Session-restart reload
  *  - ResizeObserver for responsive sizing
  *
  * Props: { symbol, initialCandles, formingCandle, interval, onIntervalChange,
- *          pendingOrders, trades, position, onClosePosition }
+ *          pendingOrders, position, onClosePosition }
  */
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { createChart } from 'lightweight-charts';
@@ -136,7 +135,6 @@ export default function CandleChart({
   interval,
   onIntervalChange,
   pendingOrders = [],
-  trades = [],
   position = null,       // { qty, avgCostPaise, symbol } — null if no position
   onClosePosition = null, // fn(position) — called on quick exit
 }) {
