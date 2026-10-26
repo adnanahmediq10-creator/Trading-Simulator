@@ -73,7 +73,7 @@ const listQuerySchema = z.object({
   status: z.enum(['PENDING', 'FILLED', 'CANCELLED', 'REJECTED']).optional(),
   symbol: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  cursor: z.string().optional(),
+  cursor: z.string().regex(/^[a-f\d]{24}$/i).optional(),
 });
 
 ordersRouter.get(
@@ -91,7 +91,7 @@ ordersRouter.get(
     if (cursor) filter._id = { $lt: cursor };
 
     const orders = await Order.find(filter)
-      .sort({ createdAt: -1 })
+    .sort({ _id: -1 })
       .limit(limit + 1)
       .lean();
 
@@ -108,6 +108,9 @@ ordersRouter.get(
 ordersRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
+    if (!/^[a-f\d]{24}$/i.test(req.params.id)) {
+      throw new DomainError('VALIDATION_ERROR', 'Invalid order id', { status: 400 });
+    }
     const io = req.app.get('io');
     const order = await cancelOrder({ userId: req.userId, orderId: req.params.id, io });
     matcher.removeOrder(req.params.id, order.symbol);
@@ -120,7 +123,7 @@ ordersRouter.delete(
 
 const tradeQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  cursor: z.string().optional(),
+  cursor: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   symbol: z.string().optional(),
 });
 
@@ -135,7 +138,7 @@ async function handleListTrades(req, res) {
   if (cursor) filter._id = { $lt: cursor };
 
   const trades = await Trade.find(filter)
-    .sort({ executedAt: -1 })
+    .sort({ _id: -1 })
     .limit(limit + 1)
     .lean();
 

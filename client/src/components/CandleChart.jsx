@@ -160,6 +160,7 @@ export default function CandleChart({
   // ── Build chart on mount ──────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current) return;
+    const priceLines = priceLinesRef.current;
     const chart = createChart(containerRef.current, {
       ...CHART_OPTIONS,
       width: containerRef.current.clientWidth,
@@ -207,7 +208,7 @@ export default function CandleChart({
       seriesRef.current = null;
       volumeRef.current = null;
       posLineRef.current = null;
-      priceLinesRef.current.clear();
+      priceLines.clear();
       lastBucketRef.current = null;
       if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
     };
@@ -248,6 +249,9 @@ export default function CandleChart({
   }, [initialCandles, symbol, interval, formingCandle]);
 
   // ── Position avg-cost price line ──────────────────────────────────────────
+  const positionQty = position?.qty;
+  const positionAvgCostPaise = position?.avgCostPaise;
+  const positionSymbol = position?.symbol;
   useEffect(() => {
     if (!seriesRef.current) return;
 
@@ -257,8 +261,8 @@ export default function CandleChart({
       posLineRef.current = null;
     }
 
-    if (position && position.qty > 0) {
-      const avgRupees = position.avgCostPaise / 100;
+    if (positionQty > 0) {
+      const avgRupees = positionAvgCostPaise / 100;
       posLineRef.current = seriesRef.current.createPriceLine({
         price: avgRupees,
         color: '#f59e0b',     // amber — distinct from buy/sell lines
@@ -268,7 +272,7 @@ export default function CandleChart({
         title: `AVG`,
       });
     }
-  }, [position?.avgCostPaise, position?.qty, position?.symbol]);
+  }, [positionAvgCostPaise, positionQty, positionSymbol]);
 
   // ── Overlay Y coordinate — update on chart scroll/zoom/tick ──────────────
   const updateOverlayY = useCallback(() => {

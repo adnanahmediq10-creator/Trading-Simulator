@@ -91,8 +91,10 @@ Returns `{ candles, source: 'db' | 'snapshot' | 'synthetic' }`.
 The source is surfaced in the status bar and `/api/health`.
 
 ### Ingest Job (`market/ingest.js`)
-Runs at boot and every 2 minutes during `DELAYED_LIVE`. Fetches 1m candles from
-`yahoo-finance2` in batches and upserts to MongoDB. Wrapped in a circuit breaker
+Runs at boot and checks every 2 minutes. It refreshes 1m candles only during
+`DELAYED_LIVE` and downloads daily history at most once per IST calendar day.
+Fresh intraday candles are reloaded into the price service after ingest. Yahoo
+requests are upserted to MongoDB and wrapped in a circuit breaker
 (CLOSED → OPEN after 5 consecutive failures → HALF_OPEN after exponential backoff).
 Never blocks the main request path — failures fall through to the candle store.
 

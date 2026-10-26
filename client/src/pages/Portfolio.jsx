@@ -28,7 +28,7 @@ function PortfolioContent() {
   const resetMutation = useMutation({
     mutationFn: api.resetAccount,
     onSuccess: () => {
-      toast('Account reset successfully. Starting fresh with ₹10,00,000.', 'success', 6000);
+      toast('Account reset successfully.', 'success', 6000);
       setShowResetConfirm(false);
       qc.invalidateQueries({ queryKey: ['portfolio'] });
       qc.invalidateQueries({ queryKey: ['orders'] });
@@ -99,7 +99,7 @@ function PortfolioContent() {
             <h2 className="text-lg font-bold text-white">Reset Account?</h2>
             <p className="text-gray-400 text-sm">
               This will delete all your orders, positions, and trades and restore your cash to
-              ₹10,00,000. This cannot be undone.
+              {` ${formatINR(portfolio?.startingCashPaise)}.`} This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button

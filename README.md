@@ -38,7 +38,7 @@ Indian retail learners who want to practise NSE trading without financial risk.
 | Auth | JWT + httpOnly cookie, bcryptjs |
 | Validation | Zod |
 | Logging | pino + pino-http |
-| Frontend | React 18 + Vite |
+| Frontend | React 19 + Vite 8 |
 | Styling | Tailwind CSS 4 |
 | Data fetching | TanStack Query |
 | Charts | lightweight-charts 4.x |

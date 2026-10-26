@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 
 let _socket = null;
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const SOCKET_ORIGIN = API_BASE.startsWith('http') ? new URL(API_BASE).origin : '/';
 
 export function useSocket() {
   const [connected, setConnected] = useState(false);
@@ -13,7 +15,7 @@ export function useSocket() {
 
   useEffect(() => {
     if (!_socket) {
-      _socket = io('/', {
+      _socket = io(SOCKET_ORIGIN, {
         path: '/socket.io',
         withCredentials: true,
         transports: ['websocket', 'polling'],

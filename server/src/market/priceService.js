@@ -6,7 +6,7 @@
  * Errors per-symbol are caught and logged; the loop continues.
  */
 import { EventEmitter } from 'node:events';
-import { getHolidays, getEffectiveMode, getVirtualTime, sessionOpenMs } from './clock.js';
+import { getHolidays, getEffectiveMode, getVirtualTime, sessionOpenMs, prevTradingDay } from './clock.js';
 import { INSTRUMENTS } from '../config/instruments.js';
 import { getSession } from './candleStore.js';
 import { tickAt, formingBar } from './tickGenerator.js';
@@ -101,6 +101,12 @@ class PriceService extends EventEmitter {
     return Object.fromEntries(this._sources);
   }
 
+  /** Reload the active candle session after ingest has written fresh bars. */
+  async refreshSession(sessionDate) {
+    if (this._cachedSessionDate === sessionDate) this._cachedSessionDate = null;
+    await this._preloadSession(sessionDate);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Internal ticker
   // ─────────────────────────────────────────────────────────────────────────
@@ -187,6 +193,11 @@ class PriceService extends EventEmitter {
         const { candles, source } = await getSession(inst.symbol, sessionDate);
         this._sessionCandles.set(`${inst.symbol}:${sessionDate}`, candles);
         this._sources.set(inst.symbol, source);
+        const previous = await getSession(inst.symbol, prevTradingDay(sessionDate, getHolidays()));
+        const previousClose = previous.candles.at(-1)?.c;
+        if (Number.isSafeInteger(previousClose) && previousClose > 0) {
+          this._prevClose.set(inst.symbol, previousClose);
+        }
       } catch (err) {
         logger.warn({ symbol: inst.symbol, err: err.message }, 'Session preload failed');
       }

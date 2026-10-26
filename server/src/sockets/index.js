@@ -26,10 +26,9 @@ export function initSocketIO(httpServer) {
   io = new Server(httpServer, {
     path: '/socket.io',
     cors:
-      env.NODE_ENV === 'development'
+      env.NODE_ENV !== 'test'
         ? { origin: env.CLIENT_ORIGIN, credentials: true }
         : false,
-    // Same-origin in production (no CORS needed)
   });
 
   // ── Auth middleware ────────────────────────────────────────────────────────

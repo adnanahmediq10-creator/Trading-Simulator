@@ -66,9 +66,12 @@ export function formatPct(pct) {
  * @param {string} val
  */
 export function rupeesToPaise(val) {
-  const n = parseFloat(val);
-  if (isNaN(n) || n <= 0) return null;
-  return Math.round(n * 100);
+  const input = String(val).trim();
+  // Require a plain positive decimal with no more than two fractional digits.
+  if (!/^\d+(?:\.\d{1,2})?$/.test(input)) return null;
+  const [rupees, fraction = ''] = input.split('.');
+  const paise = Number(rupees) * 100 + Number(fraction.padEnd(2, '0'));
+  return Number.isSafeInteger(paise) && paise > 0 ? paise : null;
 }
 
 /**

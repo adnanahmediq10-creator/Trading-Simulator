@@ -52,7 +52,7 @@ function signToken(userId) {
 const registerSchema = z
   .object({
     email: z.string().email('Must be a valid email'),
-    name: z.string().min(1).max(60),
+    name: z.string().trim().min(1).max(60),
     password: z
       .string()
       .min(8, 'Password must be at least 8 characters')

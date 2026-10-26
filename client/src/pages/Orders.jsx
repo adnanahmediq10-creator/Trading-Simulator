@@ -43,7 +43,7 @@ function OrdersContent() {
 
   const cancelMutation = useMutation({
     mutationFn: api.cancelOrder,
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast(`Order cancelled`, 'success');
       setConfirmCancelId(null);
       qc.invalidateQueries({ queryKey: ['orders'] });

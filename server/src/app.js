@@ -43,8 +43,8 @@ export function createApp(_opts = {}) {
     }),
   );
 
-  // CORS for dev only
-  if (env.NODE_ENV === 'development') {
+  // Allow the configured frontend origin in development and split deployments.
+  if (env.NODE_ENV !== 'test') {
     app.use(
       cors({
         origin: env.CLIENT_ORIGIN,

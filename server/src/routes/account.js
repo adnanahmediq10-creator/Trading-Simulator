@@ -12,7 +12,6 @@ import { Order } from '../models/Order.js';
 import { Position } from '../models/Position.js';
 import { Trade } from '../models/Trade.js';
 import { matcher } from '../engine/matcher.js';
-import { env } from '../config/env.js';
 import { DomainError } from '../engine/errors.js';
 
 export const accountRouter = Router();
@@ -33,6 +32,11 @@ accountRouter.post(
       await session.withTransaction(async () => {
         const userId = req.userId;
 
+        const user = await User.findById(userId).select('startingCashPaise').session(session);
+        if (!user) {
+          throw new DomainError('UNAUTHENTICATED', 'User not found');
+        }
+
         // Delete all user's data
         await Order.deleteMany({ userId }, { session });
         await Position.deleteMany({ userId }, { session });
@@ -41,7 +45,7 @@ accountRouter.post(
         // Restore cash to starting amount
         await User.updateOne(
           { _id: userId },
-          { $set: { cashPaise: env.STARTING_CASH_PAISE, reservedCashPaise: 0 } },
+          { $set: { cashPaise: user.startingCashPaise, reservedCashPaise: 0 } },
           { session },
         );
       });

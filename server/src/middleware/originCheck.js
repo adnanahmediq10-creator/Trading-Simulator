@@ -24,16 +24,21 @@ export function originCheck(req, _res, next) {
   if (!origin) return next();
 
   let allowed = false;
+  try {
+    const parsedOrigin = new URL(origin);
+    const isLocalOrigin =
+      parsedOrigin.protocol === 'http:' &&
+      ['localhost', '127.0.0.1', '[::1]'].includes(parsedOrigin.hostname.toLowerCase());
 
-  if (env.NODE_ENV === 'production') {
-    // Production: origin must share the same host as the server
-    allowed = !!(req.headers.host && origin.includes(req.headers.host));
-  } else {
-    // Development: allow any localhost origin (Vite proxy rewrites Origin to localhost:4000)
-    allowed =
-      origin.startsWith('http://localhost') ||
-      origin.startsWith('http://127.0.0.1') ||
-      origin === env.CLIENT_ORIGIN;
+    if (env.NODE_ENV === 'production') {
+      // The frontend may be hosted separately from the API. Match its configured origin exactly.
+      allowed = parsedOrigin.origin === new URL(env.CLIENT_ORIGIN).origin;
+    } else {
+      // Vite's dev server uses a different port from the API, so allow explicit local origins.
+      allowed = isLocalOrigin || origin === env.CLIENT_ORIGIN;
+    }
+  } catch {
+    // Invalid Origin values are rejected below.
   }
 
   if (!allowed) {

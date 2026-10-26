@@ -3,8 +3,8 @@
  *
  * Schedule:
  *   - At boot (if INGEST_ENABLED)
- *   - Every 2 minutes during DELAYED_LIVE window
- *   - Once right after the window closes (~15:46 IST)
+ *   - Refresh 1m candles every 2 minutes during DELAYED_LIVE
+ *   - Fetch daily history at most once per IST calendar day
  *
  * Safety:
  *   - All Yahoo calls go through the circuit breaker
@@ -19,12 +19,16 @@ import { getEffectiveMode, getHolidays, istDateString } from './clock.js';
 import { setBreakerState } from '../routes/health.js';
 import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
+import { priceService } from './priceService.js';
 
 const SLEEP_BETWEEN_SYMBOLS_MS = 500;
 
 const breaker = new CircuitBreaker('yahoo-ingest');
 
 let _intervalId = null;
+let _ingestRunning = false;
+let _dailyFetchDate = null;
+const _dailyFetchedSymbols = new Set();
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -97,7 +101,17 @@ async function upsertCandles(symbol, interval, rawQuotes) {
 // ── Main ingest function ──────────────────────────────────────────────────────
 
 export async function runIngest() {
-  if (!env.INGEST_ENABLED) return;
+  if (!env.INGEST_ENABLED || _ingestRunning) return;
+  _ingestRunning = true;
+
+  try {
+    await runIngestCycle();
+  } finally {
+    _ingestRunning = false;
+  }
+}
+
+async function runIngestCycle() {
 
   const nowMs = Date.now();
   const holidays = getHolidays();
@@ -105,23 +119,35 @@ export async function runIngest() {
   const today = istDateString(nowMs);
   const sessionDate = modeInfo.mode === 'DELAYED_LIVE' ? today : modeInfo.sessionDate;
 
+  if (_dailyFetchDate !== today) {
+    _dailyFetchDate = today;
+    _dailyFetchedSymbols.clear();
+  }
+
+  if (modeInfo.mode !== 'DELAYED_LIVE' && _dailyFetchedSymbols.size === INSTRUMENTS.length) {
+    return;
+  }
+
   logger.info({ sessionDate, mode: modeInfo.mode }, 'Ingest: starting');
 
   let totalUpserted = 0;
 
   for (const inst of INSTRUMENTS) {
     try {
-      // 1m candles for the current/last session
-      const quotes1m = await fetchMinutes(inst.yahoo, sessionDate);
-      const n1m = await upsertCandles(inst.symbol, '1m', quotes1m);
-      totalUpserted += n1m;
+      // 1m candles are refreshed only while the delayed live market is active.
+      if (modeInfo.mode === 'DELAYED_LIVE') {
+        const quotes1m = await fetchMinutes(inst.yahoo, sessionDate);
+        totalUpserted += await upsertCandles(inst.symbol, '1m', quotes1m);
+        await sleep(SLEEP_BETWEEN_SYMBOLS_MS);
+      }
 
-      await sleep(SLEEP_BETWEEN_SYMBOLS_MS);
-
-      // 1d candles (once a day is fine; always run for safety)
-      const quotesDaily = await fetchDaily(inst.yahoo, 365);
-      const nDaily = await upsertCandles(inst.symbol, '1d', quotesDaily);
-      totalUpserted += nDaily;
+      // Daily history changes once per trading day; avoid downloading 365 days on
+      // every two-minute intraday refresh. Failed symbols remain eligible to retry.
+      if (!_dailyFetchedSymbols.has(inst.symbol)) {
+        const quotesDaily = await fetchDaily(inst.yahoo, 365);
+        totalUpserted += await upsertCandles(inst.symbol, '1d', quotesDaily);
+        _dailyFetchedSymbols.add(inst.symbol);
+      }
 
       await sleep(SLEEP_BETWEEN_SYMBOLS_MS);
     } catch (err) {
@@ -133,6 +159,9 @@ export async function runIngest() {
   }
 
   logger.info({ totalUpserted }, 'Ingest: complete');
+  if (modeInfo.mode === 'DELAYED_LIVE') {
+    await priceService.refreshSession(sessionDate);
+  }
 }
 
 // ── Scheduler ─────────────────────────────────────────────────────────────────

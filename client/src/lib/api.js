@@ -4,7 +4,7 @@
  * Auth is via httpOnly cookie — no manual token handling.
  */
 
-const BASE = '/api';
+const BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {

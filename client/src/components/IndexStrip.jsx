@@ -23,7 +23,7 @@ export default function IndexStrip() {
     staleTime: Infinity,
   });
 
-  const indices = (data?.instruments ?? []).filter((i) => !i.tradable);
+  const indices = (data?.instruments ?? []).filter((i) => INDEX_SYMBOLS.includes(i.symbol));
 
   if (indices.length === 0) return null;
 

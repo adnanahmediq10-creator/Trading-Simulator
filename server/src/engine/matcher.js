@@ -112,6 +112,8 @@ class Matcher {
    * @param {import('../market/priceService.js').PriceService} priceService
    */
   subscribe(priceService) {
+    // On process startup, the first observed tick can also be a session jump.
+    this.markSessionRestart();
     priceService.on('ticks', ({ ticks }) => {
       for (const tick of ticks) {
         this._enqueue(tick.symbol, () => this._processTick(tick.symbol, tick.pricePaise, tick.vts));
