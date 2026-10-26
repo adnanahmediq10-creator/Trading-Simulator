@@ -108,7 +108,7 @@ function noise(seed, secIdx, points, amplitude) {
  * @returns {number} price in paise, multiple of 5
  */
 export function tickAt(symbol, candle, secIdx) {
-  const { o, h, l, c } = candle;
+  const { h, l } = candle;
   const seedStr = `${symbol}:${candle.t}`;
   const seed = cyrb53(seedStr);
   const rand = mulberry32(seed);

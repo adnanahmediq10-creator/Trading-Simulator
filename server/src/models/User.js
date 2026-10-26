@@ -42,8 +42,9 @@ const userSchema = new mongoose.Schema(
 
 // Prevent selecting passwordHash by default
 userSchema.methods.toSafeObject = function () {
-  const { passwordHash: _, ...rest } = this.toObject();
-  return rest;
+  const safeUser = this.toObject();
+  delete safeUser.passwordHash;
+  return safeUser;
 };
 
 export const User = mongoose.model('User', userSchema);

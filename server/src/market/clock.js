@@ -152,7 +152,7 @@ export function getHolidays() {
  */
 export function getMode(nowMs, holidays = _holidays) {
   const dateStr = istDateString(nowMs);
-  const { dow, minuteOfDay } = istParts(nowMs);
+  const { minuteOfDay } = istParts(nowMs);
 
   const isTradDay = !isWeekend(nowMs) && !isHoliday(dateStr, holidays);
 

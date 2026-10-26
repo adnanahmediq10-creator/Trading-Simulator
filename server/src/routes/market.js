@@ -13,7 +13,6 @@ import {
   getEffectiveMode,
   getVirtualTime,
   getHolidays,
-  istDateString,
   prevTradingDay,
   sessionOpenMs,
 } from '../market/clock.js';
@@ -24,8 +23,6 @@ import { env } from '../config/env.js';
 import { DomainError } from '../engine/errors.js';
 
 export const marketRouter = Router();
-
-const VALID_INTERVALS = ['1m', '5m', '15m', '1D'];
 
 // ── GET /api/market/status ────────────────────────────────────────────────────
 marketRouter.get(
@@ -174,8 +171,6 @@ marketRouter.get(
       // For multi-minute intervals, also include partially completed buckets
       if (interval !== '1m') {
         // Aggregate all 1m candles + forming
-        const agg = aggregate(allCandles, interval, sessionDate);
-        const prevAgg = aggregate(prevResult.candles, interval, prevDate);
 
         // Build forming bucket from completed 1m candles in current minute's bucket
         const INTERVAL_MS = interval === '5m' ? 5 * 60_000 : 15 * 60_000;
@@ -234,7 +229,7 @@ async function handleDailyCandles(res, symbol, sessionDate, virtualNowMs, limit)
     );
     const completedCandles = session1m.slice(0, completedMinutes + 1);
     forming = formingDailyBar(completedCandles, sessionDate);
-  } catch (_err) {
+  } catch {
     // Ignore — chart still works with historical daily data
   }
 

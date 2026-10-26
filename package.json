@@ -15,6 +15,7 @@
     "seed": "npm run seed -w server"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
     "concurrently": "^9.1.2"
   },
   "engines": {

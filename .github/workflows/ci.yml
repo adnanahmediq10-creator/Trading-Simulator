@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint server
+        run: npm run lint -w server
+
+      - name: Lint client
+        run: npm run lint -w client
+
+      - name: Run server tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          # JWT secret for tests (not a real secret)
+          JWT_SECRET: ci-test-secret-32chars-minimum-ok
+          JWT_EXPIRES_IN: 7d
+          # MongoDB Memory Server is used — no real URI needed
+          MONGODB_URI: mongodb://localhost:27017/test_ci
+          PORT: 4001
+          STARTING_CASH_PAISE: 100000000
+          REPLAY_SPEED: 30
+          LIVE_DELAY_MINUTES: 15
+          STALE_AFTER_MS: 30000
+          INGEST_ENABLED: false
+          SEED_DEMO_USER: false
+          LOG_LEVEL: silent
+          CLIENT_ORIGIN: http://localhost:5173
+          COOKIE_SECURE: false
+
+      - name: Build client
+        run: npm run build
+        env:
+          NODE_ENV: production

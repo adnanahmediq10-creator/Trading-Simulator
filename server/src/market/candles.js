@@ -3,7 +3,7 @@
  * Aggregates 1-minute candles into 5m, 15m, or 1D intervals.
  * All timestamps are epoch ms UTC (candle start times).
  */
-import { SESSION_OPEN_MINUTES, sessionOpenMs } from './clock.js';
+import { sessionOpenMs } from './clock.js';
 
 const MINUTE_MS = 60_000;
 
@@ -76,11 +76,9 @@ export function aggregate(candles1m, interval, sessionDate) {
  * @param {string} sessionDate 'YYYY-MM-DD'
  * @returns {{ t:number,o:number,h:number,l:number,c:number,v:number,gap?:boolean }[]}
  */
-export function fillGaps(candles, sessionDate) {
+export function fillGaps(candles, _sessionDate) {
   if (!candles || candles.length === 0) return [];
-  const openMs = sessionOpenMs(sessionDate);
-  const closeMs = openMs + SESSION_OPEN_MINUTES * 60_000; // not quite right — re-derive
-  // session spans SESSION_OPEN_MINUTES (555 min from midnight) to 930 min = 375 candles
+  // session spans the regular trading window and may require gap filling.
   // Let's just use the actual first/last from input
   const result = [];
   let prev = candles[0];

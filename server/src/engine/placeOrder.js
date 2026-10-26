@@ -16,7 +16,6 @@ import { Position } from '../models/Position.js';
 import { User } from '../models/User.js';
 import { getInstrument } from '../config/instruments.js';
 import { DomainError } from './errors.js';
-import { executeFill } from './executeFill.js';
 import { mulPaise, isValidPrice } from './money.js';
 import { logger } from '../utils/logger.js';
 
@@ -111,7 +110,7 @@ export async function placeOrder({ userId, input, idempotencyKey, priceService, 
     order = await placeLimitOrder({
       userId, symbol, side, qty, limitPricePaise,
       currentPrice, virtualNow, idempotencyKey,
-      priceService, io,
+      io,
     });
   }
 
@@ -212,7 +211,7 @@ async function placeMarketOrder({ userId, symbol, side, qty, currentPrice, virtu
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function applyFillInSession({ order, fillPricePaise, session, virtualNow }) {
-  const { userId, symbol, side, qty, type, reservedPaise } = order;
+  const { userId, symbol, side, qty } = order;
 
   if (side === 'BUY') {
     // Cash was already debited in the market order block
@@ -278,7 +277,7 @@ async function applyFillInSession({ order, fillPricePaise, session, virtualNow }
 // LIMIT order
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function placeLimitOrder({ userId, symbol, side, qty, limitPricePaise, virtualNow, idempotencyKey, priceService, io }) {
+async function placeLimitOrder({ userId, symbol, side, qty, limitPricePaise, virtualNow, idempotencyKey, io }) {
   const reservedPaise = mulPaise(limitPricePaise, qty);
   const session = await mongoose.startSession();
   let order;

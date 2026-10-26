@@ -186,7 +186,6 @@ export async function getDaily(symbol, beforeDate, limit = 250) {
 export function getDataSources() {
   const result = {};
   for (const inst of INSTRUMENTS) {
-    const cacheKey = `${inst.symbol}:*`;
     // Find any cached entry for this symbol
     let source = 'synthetic';
     for (const [key, val] of sessionCache) {
@@ -202,6 +201,8 @@ export function getDataSources() {
 
 /** Strip Mongoose document metadata */
 function toPlain(doc) {
-  const { _id, __v, ...rest } = doc;
+  const rest = { ...doc };
+  delete rest._id;
+  delete rest.__v;
   return rest;
 }

@@ -4,7 +4,7 @@
  */
 import { User } from '../models/User.js';
 import { Position } from '../models/Position.js';
-import { INSTRUMENTS, getInstrument } from '../config/instruments.js';
+import { getInstrument } from '../config/instruments.js';
 
 /**
  * @param {string} userId

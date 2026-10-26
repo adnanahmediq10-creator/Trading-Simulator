@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { dbStateLabel } from '../db.js';
 import { priceService } from '../market/priceService.js';
+import { matcher } from '../engine/matcher.js';
 import {
   getEffectiveMode,
   getVirtualTime,
@@ -39,7 +40,9 @@ healthRouter.get('/', (_req, res) => {
   const tickerStatus = priceService.getStatus();
   const dataSources = priceService.getDataSources();
 
-  const degraded = dbDown;
+  // Degraded if DB is down or if any symbol is running on synthetic data
+  const syntheticCount = Object.values(dataSources).filter((s) => s === 'synthetic').length;
+  const degraded = dbDown || syntheticCount > 0;
 
   res.status(dbDown ? 503 : 200).json({
     status: degraded ? 'degraded' : 'ok',
@@ -59,6 +62,6 @@ healthRouter.get('/', (_req, res) => {
       breaker: breakerState,
     },
     dataSources,
-    matcher: { pendingOrders: 0 }, // updated by matcher.js after M7
+    matcher: { pendingOrders: matcher.size() },
   });
 });

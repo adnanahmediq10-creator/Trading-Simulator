@@ -8,11 +8,8 @@ import {
   getVirtualTime,
   istDateString,
   istMidnightMs,
-  istParts,
   isWeekend,
-  isTradingDay,
   prevTradingDay,
-  sessionOpenMs,
   SESSION_MS,
   getEffectiveMode,
 } from '../../src/market/clock.js';
@@ -187,15 +184,13 @@ describe('getVirtualTime', () => {
 
   it('DEMO_REPLAY: loops around session boundaries', () => {
     const modeInfo = { mode: 'DEMO_REPLAY', sessionDate: '2026-10-23', reason: 'weekend' };
-    const openMs = sessionOpenMs('2026-10-23');
 
     // Advance enough to wrap one full session
     // Use a small nowMs so elapsed * speed is manageable
     // At speed=1, elapsed wraps after SESSION_MS ms of wall time
     const nowMs1 = SESSION_MS; // first second of loop 0
-    const vt0 = getVirtualTime(nowMs1, modeInfo, 1);
+    getVirtualTime(nowMs1, modeInfo, 1);
 
-    const nowMs2 = SESSION_MS + 1; // this would be loopIndex=1
     // But SESSION_MS is 22,500,000 ms of wall time...
     // Let's use a speed that makes wrapping easy
     // At speed=30, elapsed = nowMs*30, loop = floor(elapsed / SESSION_MS)

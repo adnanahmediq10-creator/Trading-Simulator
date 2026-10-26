@@ -15,26 +15,16 @@ import yahooFinance from 'yahoo-finance2';
 import { Candle } from '../models/Candle.js';
 import { INSTRUMENTS } from '../config/instruments.js';
 import { CircuitBreaker } from './circuitBreaker.js';
-import {
-  getEffectiveMode,
-  getHolidays,
-  istDateString,
-  istMidnightMs,
-  prevTradingDay,
-  sessionOpenMs,
-} from './clock.js';
+import { getEffectiveMode, getHolidays, istDateString } from './clock.js';
 import { setBreakerState } from '../routes/health.js';
 import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
 
-const SESSION_MINUTES = 375;
-const MINUTE_MS = 60_000;
 const SLEEP_BETWEEN_SYMBOLS_MS = 500;
 
 const breaker = new CircuitBreaker('yahoo-ingest');
 
 let _intervalId = null;
-let _lastMode = null;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));

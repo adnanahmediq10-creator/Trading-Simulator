@@ -2,7 +2,6 @@
  * Rate limiters for different route groups.
  */
 import rateLimit from 'express-rate-limit';
-import { DomainError } from '../engine/errors.js';
 
 function makeHandler(message) {
   return (_req, res) => {

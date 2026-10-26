@@ -81,10 +81,4 @@ export function initSocketIO(httpServer) {
   return io;
 }
 
-// Helper to avoid circular imports at module init time
-async function getInstruments() {
-  const { INSTRUMENTS } = await import('../config/instruments.js');
-  return INSTRUMENTS;
-}
-
 export { io };

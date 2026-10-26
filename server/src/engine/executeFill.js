@@ -124,11 +124,8 @@ export async function executeFill({ orderId, fillPricePaise, vts, io }) {
         executedVts: vts,
       };
       if (side === 'SELL') {
-        const pos = await Position.findOne({ userId, symbol }).session(session);
-        // pos may already be updated; get avgCostPaise before this fill from order record
-        // We re-derive pnl from the fill price and the avg cost at time of fill
-        // The pos.avgCostPaise is unchanged on sells (spec 12.3)
-        // We already computed pnl above; store it
+        await Position.findOne({ userId, symbol }).session(session);
+        // The sell P&L is already derived above and recorded on the order.
         tradeData.realizedPnlPaise = order._realizedPnlForTrade ?? 0;
       }
 

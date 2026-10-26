@@ -5,7 +5,6 @@
  * Tests cover spec section 18 engine requirements.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import mongoose from 'mongoose';
 import { startReplSet, stopReplSet, clearCollections, createUser, makePriceService } from '../helpers/db.js';
 import { placeOrder } from '../../src/engine/placeOrder.js';
 import { cancelOrder } from '../../src/engine/cancelOrder.js';
@@ -321,19 +320,12 @@ describe('Order Engine Integration Tests', () => {
       vts: Date.now(),
     });
 
-    const startCash = (await User.findById(user._id)).cashPaise;
-    const startReserved = (await User.findById(user._id)).reservedCashPaise;
-
-    // Call executeFill twice concurrently
-    const [r1, r2] = await Promise.allSettled([
+    // Call executeFill twice concurrently; exactly one should succeed (return non-null)
+    const results = await Promise.allSettled([
       executeFill({ orderId: order._id, fillPricePaise: PRICE, vts: Date.now() }),
       executeFill({ orderId: order._id, fillPricePaise: PRICE, vts: Date.now() }),
     ]);
-
-    // Exactly one should succeed (return non-null), one should return null (idempotent)
-    const successes = [r1, r2].filter(
-      (r) => r.status === 'fulfilled' && r.value !== null,
-    );
+    const successes = results.filter((r) => r.status === 'fulfilled' && r.value !== null);
     expect(successes).toHaveLength(1);
 
     // Exactly one trade
@@ -363,7 +355,7 @@ describe('Order Engine Integration Tests', () => {
       vts: Date.now(),
     });
 
-    const [fillResult, cancelResult] = await Promise.allSettled([
+    await Promise.allSettled([
       executeFill({ orderId: order._id, fillPricePaise: PRICE, vts: Date.now() }),
       cancelOrder({ userId: String(user._id), orderId: String(order._id) }),
     ]);
@@ -538,18 +530,20 @@ describe('Order Engine Integration Tests', () => {
 
   it('Invariants: reservedCash <= cash, reservedQty <= qty after random ops', async () => {
     const user = await createUser();
-    const ops = [];
-
     // Mix of buys and sells
     for (let i = 0; i < 5; i++) {
       try {
         await buyMarket(user, 2, PRICE);
-      } catch {}
+      } catch (err) {
+        void err;
+      }
     }
     for (let i = 0; i < 3; i++) {
       try {
         await sellMarket(user, 1, PRICE + 5000);
-      } catch {}
+      } catch (err) {
+        void err;
+      }
     }
     // Place a limit order
     try {
@@ -560,7 +554,9 @@ describe('Order Engine Integration Tests', () => {
         priceService: ps(PRICE),
         vts: Date.now(),
       });
-    } catch {}
+    } catch (err) {
+      void err;
+    }
 
     const finalUser = await User.findById(user._id);
     expect(finalUser.cashPaise).toBeGreaterThanOrEqual(0);
