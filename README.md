@@ -99,7 +99,7 @@ npm run dev
 
 ```bash
 npm test
-# All 94 tests pass (unit + integration, using MongoMemoryReplSet)
+# All 148 tests pass (unit + integration, using MongoMemoryReplSet)
 ```
 
 ### 5. Snapshot candles (run once, data committed)
@@ -219,14 +219,15 @@ The in-memory matcher works correctly on a single process. Horizontal scaling (m
 ## Testing
 
 ```bash
-npm test    # runs all 94 tests
+npm test    # runs all 148 tests (8 test files)
 ```
 
-**Unit tests** (Vitest): clock `getMode`/`getVirtualTime`, tick generator determinism and bounds, candle aggregation, circuit breaker state machine, money helpers.
+**Unit tests** (Vitest): `clock.test.js` (29 — mode/time), `tickGenerator.test.js` (18 — determinism), `candles.test.js` (16 — aggregation), `circuitBreaker.test.js` (9 — state machine), `money.test.js` (23 — paise helpers).
 
-**Engine integration tests** (Vitest + MongoMemoryReplSet): market BUY/SELL fills, weighted average cost, insufficient funds/shares, reserved funds, double-fill prevention via concurrent `executeFill`, cancel-vs-fill race, transaction rollback, idempotency, session-restart guard, restart recovery.
-
-**API tests** (Supertest): auth flow, cookie flags, validation errors, missing idempotency key, unauthenticated 401, health endpoint.
+**Integration tests** (Vitest + MongoMemoryReplSet + Supertest):
+- `engine.test.js` (27 — market/limit fills, avg cost, insufficient funds, concurrent double-fill prevention, cancel race, idempotency, rollback)
+- `api.test.js` (27 — auth register/login/logout/me, market status/instruments/candles, order validation, portfolio, account reset)
+- `health.test.js` (1 — /api/health endpoint)
 
 ---
 
