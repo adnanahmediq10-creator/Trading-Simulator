@@ -1,11 +1,12 @@
 /**
  * Dashboard — main trading view.
- * Layout: [WatchList | CandleChart + OrderPanel]
+ * Layout: IndexStrip | [WatchList | CandleChart + OrderPanel]
  */
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Navbar from '../components/Navbar.jsx';
 import StatusBar from '../components/StatusBar.jsx';
+import IndexStrip from '../components/IndexStrip.jsx';
 import WatchList from '../components/WatchList.jsx';
 import CandleChart from '../components/CandleChart.jsx';
 import OrderPanel from '../components/OrderPanel.jsx';
@@ -88,6 +89,7 @@ export default function Dashboard() {
       <div className="flex flex-col h-screen overflow-hidden">
         <Navbar />
         <StatusBar />
+        <IndexStrip />
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left: WatchList */}
