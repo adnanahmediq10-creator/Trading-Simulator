@@ -3,15 +3,16 @@
  *  - Candlestick + volume series
  *  - Live 1-second tick updates
  *  - Pending limit order price lines
+ *  - Position avg-cost line with live P&L overlay + quick-exit button
  *  - Fill markers from trade history
  *  - Interval selector (1m, 5m, 15m, 1D)
  *  - Session-restart reload
  *  - ResizeObserver for responsive sizing
  *
  * Props: { symbol, initialCandles, formingCandle, interval, onIntervalChange,
- *          pendingOrders, trades }
+ *          pendingOrders, trades, position, onClosePosition }
  */
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { createChart } from 'lightweight-charts';
 import { toChartTime } from '../lib/time.js';
 import { formatINR } from '../lib/money.js';
@@ -75,6 +76,59 @@ function toVolumeData(c) {
   };
 }
 
+// ── Position P&L Overlay ──────────────────────────────────────────────────────
+function PositionOverlay({ avgCostPaise, qty, currentPricePaise, y, onClose }) {
+  if (y === null || y === undefined || qty <= 0) return null;
+
+  const pnlPaise = currentPricePaise
+    ? (currentPricePaise - avgCostPaise) * qty
+    : 0;
+  const isProfit = pnlPaise >= 0;
+  const pnlRupees = (pnlPaise / 100).toFixed(0);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        right: 66, // leave room for price axis (~60px wide)
+        top: Math.round(y),
+        transform: 'translateY(-50%)',
+        zIndex: 20,
+        pointerEvents: 'auto',
+      }}
+    >
+      <div
+        className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-xs font-mono shadow-lg ${
+          isProfit
+            ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-300'
+            : 'bg-red-950/95 border-red-500/60 text-red-300'
+        }`}
+      >
+        {/* Quantity */}
+        <span className="text-gray-400 font-medium">{qty}×</span>
+
+        {/* Live P&L */}
+        <span className="font-semibold">
+          {isProfit ? '+' : ''}₹{pnlRupees}
+        </span>
+
+        {/* Quick exit button */}
+        <button
+          onClick={onClose}
+          title="Close position at market price"
+          className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[10px] transition-colors ${
+            isProfit
+              ? 'text-emerald-400 hover:bg-emerald-700/60 hover:text-white'
+              : 'text-red-400 hover:bg-red-700/60 hover:text-white'
+          }`}
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function CandleChart({
   symbol,
   initialCandles = [],
@@ -83,20 +137,28 @@ export default function CandleChart({
   onIntervalChange,
   pendingOrders = [],
   trades = [],
+  position = null,       // { qty, avgCostPaise, symbol } — null if no position
+  onClosePosition = null, // fn(position) — called on quick exit
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const volumeRef = useRef(null);
-  // Map orderId -> price line reference
+  // Map orderId -> price line reference (for pending limit orders)
   const priceLinesRef = useRef(new Map());
+  // Single price line for position avg cost
+  const posLineRef = useRef(null);
   // Last bar bucket index for detecting rollover
   const lastBucketRef = useRef(null);
   // Debounce refetch timer
   const refetchTimerRef = useRef(null);
+  // Overlay Y coordinate
+  const [overlayY, setOverlayY] = useState(null);
 
+  const { getTick } = useTicks();
   const { socket } = useSocket();
-  useTicks(); // keep ticks flowing
+  const currentTick = getTick(symbol);
+  const currentPricePaise = currentTick?.pricePaise ?? null;
 
   // ── Build chart on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -147,6 +209,7 @@ export default function CandleChart({
       chartRef.current = null;
       seriesRef.current = null;
       volumeRef.current = null;
+      posLineRef.current = null;
       priceLinesRef.current.clear();
       lastBucketRef.current = null;
       if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
@@ -157,7 +220,7 @@ export default function CandleChart({
   useEffect(() => {
     if (!seriesRef.current) return;
 
-    // Clear existing price lines when data changes
+    // Clear existing pending price lines when data changes
     priceLinesRef.current.forEach((line) => {
       try { seriesRef.current?.removePriceLine(line); } catch { /* ignore */ }
     });
@@ -180,13 +243,64 @@ export default function CandleChart({
       volumeRef.current?.update(toVolumeData(formingCandle));
     }
 
-    // Record last bucket for rollover detection
     if (data.length > 0) {
       lastBucketRef.current = data[data.length - 1].time;
     }
 
     chartRef.current?.timeScale().fitContent();
   }, [initialCandles, symbol, interval, formingCandle]);
+
+  // ── Position avg-cost price line ──────────────────────────────────────────
+  useEffect(() => {
+    if (!seriesRef.current) return;
+
+    // Remove old position line
+    if (posLineRef.current) {
+      try { seriesRef.current.removePriceLine(posLineRef.current); } catch { /* ignore */ }
+      posLineRef.current = null;
+    }
+
+    if (position && position.qty > 0) {
+      const avgRupees = position.avgCostPaise / 100;
+      posLineRef.current = seriesRef.current.createPriceLine({
+        price: avgRupees,
+        color: '#f59e0b',     // amber — distinct from buy/sell lines
+        lineWidth: 1,
+        lineStyle: 0,          // solid
+        axisLabelVisible: true,
+        title: `AVG`,
+      });
+    }
+  }, [position?.avgCostPaise, position?.qty, position?.symbol]);
+
+  // ── Overlay Y coordinate — update on chart scroll/zoom/tick ──────────────
+  const updateOverlayY = useCallback(() => {
+    if (!seriesRef.current || !position || position.qty <= 0) {
+      setOverlayY(null);
+      return;
+    }
+    try {
+      const y = seriesRef.current.priceToCoordinate(position.avgCostPaise / 100);
+      setOverlayY(y ?? null);
+    } catch {
+      setOverlayY(null);
+    }
+  }, [position]);
+
+  // Subscribe to chart events + poll for smooth updates
+  useEffect(() => {
+    updateOverlayY();
+    if (!chartRef.current) return;
+
+    chartRef.current.timeScale().subscribeVisibleTimeRangeChange(updateOverlayY);
+    // Poll every 300ms to keep overlay synced with price scale movements
+    const id = setInterval(updateOverlayY, 300);
+
+    return () => {
+      chartRef.current?.timeScale().unsubscribeVisibleTimeRangeChange(updateOverlayY);
+      clearInterval(id);
+    };
+  }, [updateOverlayY]);
 
   // ── Update forming candle from ticks ─────────────────────────────────────
   useEffect(() => {
@@ -204,25 +318,16 @@ export default function CandleChart({
       const low = tick.bar?.l != null ? tick.bar.l / 100 : tick.pricePaise / 100;
       const close = tick.pricePaise / 100;
 
-      // Detect bar rollover
       if (lastBucketRef.current !== null && bucketTime > lastBucketRef.current) {
-        // New bucket started — update then debounce a refetch to reconcile
         lastBucketRef.current = bucketTime;
         if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
         refetchTimerRef.current = setTimeout(() => {
-          // Signal parent to refetch candles — via a custom event
           containerRef.current?.dispatchEvent(new CustomEvent('chart:refetch'));
         }, 2000);
       }
 
       try {
-        seriesRef.current.update({
-          time: bucketTime,
-          open,
-          high,
-          low,
-          close,
-        });
+        seriesRef.current.update({ time: bucketTime, open, high, low, close });
         volumeRef.current?.update({
           time: bucketTime,
           value: tick.bar?.v ?? 0,
@@ -231,11 +336,14 @@ export default function CandleChart({
       } catch {
         // Ignore out-of-order updates
       }
+
+      // Update overlay Y after price scale may have shifted
+      updateOverlayY();
     }
 
     socket.on('ticks', onTicks);
     return () => socket.off('ticks', onTicks);
-  }, [socket, symbol, interval]);
+  }, [socket, symbol, interval, updateOverlayY]);
 
   // ── Session-restart: clear chart ─────────────────────────────────────────
   useEffect(() => {
@@ -255,7 +363,6 @@ export default function CandleChart({
   useEffect(() => {
     if (!seriesRef.current) return;
 
-    // Remove lines for orders no longer pending
     const pendingIds = new Set(pendingOrders.map((o) => o._id));
     for (const [id, line] of priceLinesRef.current) {
       if (!pendingIds.has(id)) {
@@ -264,7 +371,6 @@ export default function CandleChart({
       }
     }
 
-    // Add lines for new pending orders
     for (const order of pendingOrders) {
       if (priceLinesRef.current.has(order._id)) continue;
       if (!order.limitPricePaise) continue;
@@ -298,7 +404,6 @@ export default function CandleChart({
         text: `${t.side[0]} ${t.qty} @ ${formatINR(t.pricePaise)}`,
         size: 1,
       }))
-      // Sort by time ascending (required by lightweight-charts)
       .sort((a, b) => a.time - b.time);
 
     try {
@@ -327,12 +432,21 @@ export default function CandleChart({
         ))}
       </div>
 
-      {/* Chart container */}
+      {/* Chart container — position:relative for overlay */}
       <div
         ref={containerRef}
-        className="flex-1 rounded-lg overflow-hidden"
+        className="flex-1 rounded-lg overflow-hidden relative"
         style={{ minHeight: 320 }}
-      />
+      >
+        {/* Position P&L Overlay */}
+        <PositionOverlay
+          avgCostPaise={position?.avgCostPaise}
+          qty={position?.qty ?? 0}
+          currentPricePaise={currentPricePaise}
+          y={overlayY}
+          onClose={() => onClosePosition?.(position)}
+        />
+      </div>
     </div>
   );
 }

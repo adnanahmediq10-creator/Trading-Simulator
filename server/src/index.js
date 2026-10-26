@@ -22,9 +22,25 @@ async function boot() {
   // 4. Create Express app
   const app = createApp();
 
-  // 5. Start HTTP server
-  server = app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT, env: env.NODE_ENV }, 'HTTP server listening');
+  // 5. Start HTTP server — retry on EADDRINUSE (ghost process from prior run)
+  await new Promise((resolve, reject) => {
+    function tryListen(attemptsLeft) {
+      const s = app.listen(env.PORT, () => {
+        server = s;
+        logger.info({ port: env.PORT, env: env.NODE_ENV }, 'HTTP server listening');
+        resolve();
+      });
+      s.once('error', (err) => {
+        if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
+          logger.warn({ port: env.PORT, attemptsLeft }, 'Port in use — retrying in 2s…');
+          s.close();
+          setTimeout(() => tryListen(attemptsLeft - 1), 2000);
+        } else {
+          reject(err);
+        }
+      });
+    }
+    tryListen(5); // up to 5 retries × 2s = 10s max wait
   });
 
   // 6. Wire Socket.IO (done in sockets/index.js)
@@ -44,6 +60,7 @@ async function boot() {
 
   logger.info('Boot complete');
 }
+
 
 async function shutdown(signal) {
   logger.info({ signal }, 'Shutting down');

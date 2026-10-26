@@ -3,8 +3,8 @@
  * Layout: IndexStrip | [WatchList | CandleChart + OrderPanel] | BottomBar
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { v4 as uuidv4 } from 'uuid';
 import Navbar from '../components/Navbar.jsx';
 import StatusBar from '../components/StatusBar.jsx';
 import IndexStrip from '../components/IndexStrip.jsx';
@@ -109,6 +109,23 @@ function DashboardContent() {
     setPrefillQty(String(qty));
   }, []);
 
+  // Close a full position instantly via MARKET SELL
+  const handleClosePosition = useCallback(async (pos) => {
+    try {
+      await api.placeOrder(
+        { symbol: pos.symbol, side: 'SELL', type: 'MARKET', qty: pos.qty },
+        uuidv4(),
+      );
+      toast(`Closing ${pos.qty} × ${pos.symbol} at market…`, 'success');
+      qc.invalidateQueries({ queryKey: ['portfolio'] });
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['trades', symbol] });
+      qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+    } catch (err) {
+      toast(err.message ?? 'Close position failed', 'error');
+    }
+  }, [qc, toast, symbol]);
+
   const changePaise = tick ? tick.pricePaise - (tick.prevClosePaise ?? tick.pricePaise) : 0;
   const pnl = formatPnl(changePaise);
 
@@ -116,6 +133,8 @@ function DashboardContent() {
   const symbolPendingOrders = allPendingOrders.filter((o) => o.symbol === symbol);
   const trades = tradesData?.trades ?? [];
   const positions = portfolioData?.positions ?? [];
+  // Current symbol's open position (for chart overlay)
+  const symbolPosition = positions.find((p) => p.symbol === symbol && p.qty > 0) ?? null;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -176,6 +195,8 @@ function DashboardContent() {
                 onIntervalChange={setChartInterval}
                 pendingOrders={symbolPendingOrders}
                 trades={trades}
+                position={symbolPosition}
+                onClosePosition={handleClosePosition}
               />
             )}
           </div>
@@ -206,6 +227,7 @@ function DashboardContent() {
                   positions={positions}
                   isLoading={portfolioLoading}
                   onSellClick={handleSellShortcut}
+                  onClosePosition={handleClosePosition}
                 />
               ) : (
                 <OpenOrders
