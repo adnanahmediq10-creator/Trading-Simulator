@@ -30,6 +30,16 @@ export function errorHandler(err, req, res, _next) {
     });
   }
 
+  // MongoDB duplicate key (E11000) — e.g. duplicate idempotency key race
+  if (err.code === 11000) {
+    return res.status(409).json({
+      error: {
+        code: 'DUPLICATE_REQUEST',
+        message: 'Duplicate request',
+      },
+    });
+  }
+
   logger.error({ err, path: req.path, reqId: req.id }, 'Unhandled error');
 
   return res.status(500).json({
