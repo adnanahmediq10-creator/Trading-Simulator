@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import cors from 'cors';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { healthRouter } from './routes/health.js';
@@ -77,7 +78,7 @@ export function createApp(_opts = {}) {
   app.use('/api/account', accountRouter);
 
   // Production: serve built React app with SPA fallback
-  if (env.NODE_ENV === 'production') {
+  if (env.NODE_ENV === 'production' && fs.existsSync(clientDist)) {
     app.use(express.static(clientDist));
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
