@@ -51,6 +51,13 @@ async function shutdown(signal) {
     priceService.stop();
     stopIngest();
 
+    try {
+      const { closeSocketIO } = await import('./sockets/index.js');
+      await closeSocketIO();
+    } catch (err) {
+      logger.warn({ err: err.message }, 'Socket.IO close skipped');
+    }
+
     await new Promise((resolve, reject) => {
       if (server) {
         server.close((err) => (err ? reject(err) : resolve()));

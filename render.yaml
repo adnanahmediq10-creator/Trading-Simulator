@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: tradevirtual
+    runtime: node
+    plan: free
+    region: singapore
+
+    # Build: install all workspaces, then build the React client
+    buildCommand: npm ci && npm run build
+
+    # Start: run the Node server (serves both API and built client)
+    startCommand: npm start
+
+    # Health-check endpoint — Render uses this to confirm the app is up
+    healthCheckPath: /api/health
+
+    # Environment variables — set these in the Render dashboard
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      - key: PORT
+        value: 4000
+
+      - key: COOKIE_SECURE
+        value: true
+
+      - key: MONGODB_URI
+        sync: false   # Set in dashboard — Atlas connection string
+
+      - key: JWT_SECRET
+        generateValue: true   # Auto-generate a strong secret
+
+      - key: JWT_EXPIRES_IN
+        value: 7d
+
+      - key: STARTING_CASH_PAISE
+        value: "100000000"
+
+      - key: REPLAY_SPEED
+        value: "30"
+
+      - key: LIVE_DELAY_MINUTES
+        value: "15"
+
+      - key: STALE_AFTER_MS
+        value: "30000"
+
+      - key: INGEST_ENABLED
+        value: "true"
+
+      - key: LOG_LEVEL
+        value: "info"
+
+      - key: SEED_DEMO_USER
+        value: "false"

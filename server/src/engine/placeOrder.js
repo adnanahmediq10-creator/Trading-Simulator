@@ -188,7 +188,7 @@ async function placeMarketOrder({ userId, symbol, side, qty, currentPrice, virtu
     // Idempotency: if duplicate key, return existing order
     if (err.code === 11000) {
       const existing = await Order.findOne({ userId, idempotencyKey });
-      if (existing) return existing;
+      if (existing) return { order: existing, idempotent: true };
     }
     throw err;
   }
@@ -246,15 +246,29 @@ async function applyFillInSession({ order, fillPricePaise, session, virtualNow }
       { $inc: { qty: -qty, realizedPnlPaise: pnl } },
       { session },
     );
+
+    const { Trade } = await import('../models/Trade.js');
+    await Trade.create(
+      [
+        {
+          orderId: order._id,
+          userId,
+          symbol,
+          side,
+          qty,
+          pricePaise: fillPricePaise,
+          realizedPnlPaise: pnl,
+          executedAt: new Date(),
+          executedVts: virtualNow,
+        },
+      ],
+      { session },
+    );
+    return;
   }
 
-  // Write trade
+  // Write BUY trade
   const { Trade } = await import('../models/Trade.js');
-  const pos = await Position.findOne({ userId, symbol }).session(session);
-  const pnlForTrade = side === 'SELL' && pos
-    ? (fillPricePaise - (pos.avgCostPaise ?? fillPricePaise)) * qty
-    : 0;
-
   await Trade.create(
     [
       {
@@ -264,7 +278,7 @@ async function applyFillInSession({ order, fillPricePaise, session, virtualNow }
         side,
         qty,
         pricePaise: fillPricePaise,
-        realizedPnlPaise: pnlForTrade,
+        realizedPnlPaise: 0,
         executedAt: new Date(),
         executedVts: virtualNow,
       },
@@ -337,7 +351,7 @@ async function placeLimitOrder({ userId, symbol, side, qty, limitPricePaise, vir
     await session.endSession();
     if (err.code === 11000) {
       const existing = await Order.findOne({ userId, idempotencyKey });
-      if (existing) return existing;
+      if (existing) return { order: existing, idempotent: true };
     }
     throw err;
   }

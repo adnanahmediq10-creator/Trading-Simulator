@@ -9,6 +9,8 @@ import { startReplSet, stopReplSet, clearCollections, createUser, makePriceServi
 import { placeOrder } from '../../src/engine/placeOrder.js';
 import { cancelOrder } from '../../src/engine/cancelOrder.js';
 import { executeFill } from '../../src/engine/executeFill.js';
+import { matcher } from '../../src/engine/matcher.js';
+import { Trade as TradeModel } from '../../src/models/Trade.js';
 import { Order } from '../../src/models/Order.js';
 import { Position } from '../../src/models/Position.js';
 import { Trade } from '../../src/models/Trade.js';
@@ -569,5 +571,83 @@ describe('Order Engine Integration Tests', () => {
       expect(pos.reservedQty).toBeGreaterThanOrEqual(0);
       expect(pos.reservedQty).toBeLessThanOrEqual(pos.qty);
     }
+  });
+
+  it('Marketable LIMIT fills immediately via evaluateOrder', async () => {
+    const user = await createUser();
+    const { order } = await placeOrder({
+      userId: String(user._id),
+      input: { symbol: SYMBOL, side: 'BUY', type: 'LIMIT', qty: 2, limitPricePaise: PRICE },
+      idempotencyKey: `mktable-${Date.now()}`,
+      priceService: ps(PRICE),
+      vts: Date.now(),
+    });
+    expect(order.status).toBe('PENDING');
+    await matcher.evaluateOrder(order, PRICE, Date.now());
+    const filled = await Order.findById(order._id);
+    expect(filled.status).toBe('FILLED');
+    expect(filled.filledPricePaise).toBe(PRICE);
+  });
+
+  it('Session-restart guard: first tick after restart does not fill', async () => {
+    const user = await createUser();
+    const { order } = await placeOrder({
+      userId: String(user._id),
+      input: { symbol: SYMBOL, side: 'BUY', type: 'LIMIT', qty: 1, limitPricePaise: PRICE },
+      idempotencyKey: `skip-${Date.now()}`,
+      priceService: ps(PRICE),
+      vts: Date.now(),
+    });
+    await matcher.rebuild();
+    matcher.markSessionRestart();
+    await matcher.onTick(SYMBOL, PRICE - 500, Date.now());
+    expect((await Order.findById(order._id)).status).toBe('PENDING');
+    await matcher.onTick(SYMBOL, PRICE - 500, Date.now());
+    expect((await Order.findById(order._id)).status).toBe('FILLED');
+  });
+
+  it('Restart recovery: rebuild from DB then later tick fills', async () => {
+    const user = await createUser();
+    const { order } = await placeOrder({
+      userId: String(user._id),
+      input: { symbol: SYMBOL, side: 'BUY', type: 'LIMIT', qty: 1, limitPricePaise: PRICE },
+      idempotencyKey: `rebuild-${Date.now()}`,
+      priceService: ps(PRICE),
+      vts: Date.now(),
+    });
+    matcher._index.clear();
+    matcher._pendingCount = 0;
+    await matcher.rebuild();
+    expect(matcher.size()).toBeGreaterThan(0);
+    await matcher.onTick(SYMBOL, PRICE, Date.now());
+    expect((await Order.findById(order._id)).status).toBe('FILLED');
+  });
+
+  it('Transaction rollback: trade insert failure leaves order PENDING', async () => {
+    const user = await createUser();
+    const { order } = await placeOrder({
+      userId: String(user._id),
+      input: { symbol: SYMBOL, side: 'BUY', type: 'LIMIT', qty: 1, limitPricePaise: PRICE },
+      idempotencyKey: `rollback-${Date.now()}`,
+      priceService: ps(PRICE),
+      vts: Date.now(),
+    });
+    const before = await User.findById(user._id);
+    const origCreate = TradeModel.create.bind(TradeModel);
+    TradeModel.create = async () => {
+      throw new Error('forced trade failure');
+    };
+    try {
+      await expect(
+        executeFill({ orderId: order._id, fillPricePaise: PRICE, vts: Date.now() }),
+      ).rejects.toThrow(/forced trade failure/);
+    } finally {
+      TradeModel.create = origCreate;
+    }
+    const still = await Order.findById(order._id);
+    expect(still.status).toBe('PENDING');
+    const after = await User.findById(user._id);
+    expect(after.cashPaise).toBe(before.cashPaise);
+    expect(after.reservedCashPaise).toBe(before.reservedCashPaise);
   });
 });

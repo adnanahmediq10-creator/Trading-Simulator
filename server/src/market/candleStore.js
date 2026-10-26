@@ -99,10 +99,12 @@ export async function getSession(symbol, sessionDate, opts = {}) {
     }
   }
 
-  // ── Tier 2: Snapshot ──────────────────────────────────────────────────────
+  // ── Tier 2: Snapshot (exact date, else most recent committed session remapped)
   const snap = snapshotCache.get(symbol);
-  if (snap?.sessions?.[sessionDate]?.length >= 50) {
-    const candles = fillGaps(snap.sessions[sessionDate], sessionDate);
+  const snapBars = pickSnapshotSession(snap, sessionDate);
+  if (snapBars?.length >= 50) {
+    const remapped = remapSessionCandles(snapBars, sessionDate);
+    const candles = fillGaps(remapped, sessionDate);
     sessionCache.set(cacheKey, { candles, source: 'snapshot' });
     return { candles, source: 'snapshot' };
   }
@@ -197,6 +199,33 @@ export function getDataSources() {
     result[inst.symbol] = source;
   }
   return result;
+}
+
+/**
+ * Prefer the requested session date; otherwise reuse the latest committed session.
+ * @param {{ sessions?: Record<string, object[]> }|undefined} snap
+ * @param {string} sessionDate
+ */
+function pickSnapshotSession(snap, sessionDate) {
+  if (!snap?.sessions) return null;
+  if (snap.sessions[sessionDate]?.length >= 50) return snap.sessions[sessionDate];
+  const dates = Object.keys(snap.sessions).sort();
+  for (let i = dates.length - 1; i >= 0; i--) {
+    if (snap.sessions[dates[i]]?.length >= 50) return snap.sessions[dates[i]];
+  }
+  return null;
+}
+
+/**
+ * Shift candle timestamps so they align with the requested session open.
+ * Needed because committed snapshots are from a specific historical date.
+ */
+function remapSessionCandles(bars, sessionDate) {
+  const openMs = sessionOpenMs(sessionDate);
+  return bars.map((c, i) => ({
+    ...c,
+    t: openMs + i * 60_000,
+  }));
 }
 
 /** Strip Mongoose document metadata */

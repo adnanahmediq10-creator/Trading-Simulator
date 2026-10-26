@@ -19,7 +19,7 @@ import { originCheck } from './middleware/originCheck.js';
 import { env } from './config/env.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const clientDist = path.resolve(__dirname, '../../../client/dist');
+const clientDist = path.resolve(__dirname, '../../client/dist');
 
 /**
  * @param {{ skipDb?: boolean }} [_opts]

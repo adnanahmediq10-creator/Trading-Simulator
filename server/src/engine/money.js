@@ -3,11 +3,28 @@
  * Section 5 of spec.
  */
 
-/** @param {number} n */
-export function assertPaise(n) {
-  if (!Number.isSafeInteger(n) || n < 0) {
-    throw new TypeError(`Expected non-negative safe integer paise, got: ${n}`);
+/**
+ * Guard that a value is a safe integer (optionally non-negative).
+ * @param {number} n
+ * @param {string} [_label]
+ * @param {boolean} [minZero=false]
+ */
+export function assertPaise(n, _label, minZero = false) {
+  if (!Number.isSafeInteger(n)) {
+    throw new TypeError(`Expected safe integer paise, got: ${n}`);
   }
+  if (minZero && n < 0) {
+    throw new TypeError(`Expected non-negative paise, got: ${n}`);
+  }
+}
+
+/**
+ * Round a numeric amount to integer paise.
+ * @param {number} n
+ * @returns {number}
+ */
+export function safePaise(n) {
+  return Math.round(n);
 }
 
 /**
@@ -17,6 +34,11 @@ export function assertPaise(n) {
  */
 export function toPaise(rupees) {
   return Math.round(rupees * 100);
+}
+
+/** @param {number} paise */
+export function paiseToRupees(paise) {
+  return paise / 100;
 }
 
 /**
@@ -48,6 +70,9 @@ export function weightedAvg(oldQty, oldAvgPaise, addQty, addPricePaise) {
   const total = oldQty + addQty;
   return Math.round((oldQty * oldAvgPaise + addQty * addPricePaise) / total);
 }
+
+/** Alias used by tests / callers that prefer the longer name. */
+export const weightedAvgCost = weightedAvg;
 
 /**
  * Realised P&L on a sell = (sellPrice - avgCost) * qty (integer arithmetic).

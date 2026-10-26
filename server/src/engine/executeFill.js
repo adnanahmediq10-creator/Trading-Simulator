@@ -95,6 +95,7 @@ export async function executeFill({ orderId, fillPricePaise, vts, io }) {
 
         const proceeds = mulPaise(fillPricePaise, qty);
         const pnl = realizedPnl(fillPricePaise, pos.avgCostPaise, qty);
+        order._realizedPnlForTrade = pnl;
 
         // Credit cash
         await User.updateOne({ _id: userId }, { $inc: { cashPaise: proceeds } }, { session });
@@ -124,8 +125,6 @@ export async function executeFill({ orderId, fillPricePaise, vts, io }) {
         executedVts: vts,
       };
       if (side === 'SELL') {
-        await Position.findOne({ userId, symbol }).session(session);
-        // The sell P&L is already derived above and recorded on the order.
         tradeData.realizedPnlPaise = order._realizedPnlForTrade ?? 0;
       }
 

@@ -11,6 +11,7 @@
 import { Order } from '../models/Order.js';
 import { executeFill } from './executeFill.js';
 import { logger } from '../utils/logger.js';
+import { INSTRUMENTS } from '../config/instruments.js';
 
 /**
  * @typedef {{ _id: string, userId: string, symbol: string, side: 'BUY'|'SELL',
@@ -58,13 +59,21 @@ class Matcher {
   }
 
   /**
-   * Register a newly placed PENDING order and evaluate it immediately.
+   * Register a newly placed PENDING order and evaluate it immediately
+   * against the latest tick (marketable limits fill right away).
+   * Immediate evaluation is not subject to the session-restart skip.
    * @param {object} order
+   * @param {number} [tickPrice]
+   * @param {number} [vts]
    */
-  async evaluateOrder(order) {
+  async evaluateOrder(order, tickPrice, vts) {
     this._addToIndex(order);
-    // Evaluate immediately against latest known price
-    // (called by priceService after placing)
+    if (tickPrice == null) return;
+    const shouldFill =
+      (order.side === 'BUY' && tickPrice <= order.limitPricePaise) ||
+      (order.side === 'SELL' && tickPrice >= order.limitPricePaise);
+    if (!shouldFill) return;
+    await this._processTick(order.symbol, tickPrice, vts ?? Date.now(), { ignoreSkip: true });
   }
 
   /**
@@ -88,6 +97,16 @@ class Matcher {
     return this._pendingCount;
   }
 
+  /** Test/helper: process one tick as the price service would. */
+  async onTick(symbol, pricePaise, vts) {
+    await this._processTick(symbol, pricePaise, vts);
+  }
+
+  /** Test/helper: arm the session-restart skip for every symbol. */
+  markSessionRestart() {
+    for (const inst of INSTRUMENTS) this._skipNext.add(inst.symbol);
+  }
+
   /**
    * Subscribe to price service events.
    * @param {import('../market/priceService.js').PriceService} priceService
@@ -101,10 +120,9 @@ class Matcher {
 
     priceService.on('session-restart', ({ sessionEpoch }) => {
       logger.info({ sessionEpoch }, 'Matcher: session restart — skipping first tick for all symbols');
-      for (const symbol of this._index.keys()) {
-        this._skipNext.add(symbol);
+      for (const inst of INSTRUMENTS) {
+        this._skipNext.add(inst.symbol);
       }
-      // Also skip for any symbol in the tick stream
     });
   }
 
@@ -118,6 +136,13 @@ class Matcher {
       this._index.set(order.symbol, { buys: [], sells: [] });
     }
     const bucket = this._index.get(order.symbol);
+    const id = String(order._id);
+    if (
+      bucket.buys.some((o) => String(o._id) === id) ||
+      bucket.sells.some((o) => String(o._id) === id)
+    ) {
+      return;
+    }
     if (order.side === 'BUY') {
       bucket.buys.push(order);
       bucket.buys.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -147,9 +172,15 @@ class Matcher {
    * @param {number} pricePaise
    * @param {number} vts
    */
-  async _processTick(symbol, pricePaise, vts) {
-    // Session-restart guard: skip first tick
-    if (this._skipNext.has(symbol)) {
+  /**
+   * @param {string} symbol
+   * @param {number} pricePaise
+   * @param {number} vts
+   * @param {{ ignoreSkip?: boolean }} [opts]
+   */
+  async _processTick(symbol, pricePaise, vts, opts = {}) {
+    // Session-restart guard: skip first ticker tick of a new epoch
+    if (!opts.ignoreSkip && this._skipNext.has(symbol)) {
       this._skipNext.delete(symbol);
       return;
     }

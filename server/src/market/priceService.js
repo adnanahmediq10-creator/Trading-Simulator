@@ -38,6 +38,8 @@ class PriceService extends EventEmitter {
     this._prevClose = new Map();
     /** @type {number|null} */
     this._lastTickAt = null;
+    /** When DELAYED_LIVE has no Mongo candles, stay on DEMO_REPLAY. */
+    this._liveUnavailable = false;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -107,12 +109,23 @@ class PriceService extends EventEmitter {
     const nowMs = Date.now();
     const holidays = getHolidays();
 
-    // Check if live data is available (if in live mode but no candles in DB, degrade)
-    const liveDataAvailable = this._isLiveDataAvailable();
-    const modeInfo = getEffectiveMode(nowMs, holidays, liveDataAvailable);
+    let modeInfo = getEffectiveMode(nowMs, holidays, !this._liveUnavailable);
+    await this._preloadSession(modeInfo.sessionDate);
+
+    if (modeInfo.mode === 'DELAYED_LIVE') {
+      const anyDb = [...this._sources.values()].some((s) => s === 'db');
+      this._liveUnavailable = !anyDb;
+      if (this._liveUnavailable) {
+        modeInfo = getEffectiveMode(nowMs, holidays, false);
+        await this._preloadSession(modeInfo.sessionDate);
+      }
+    } else {
+      this._liveUnavailable = false;
+    }
+
     const { virtualNowMs, sessionEpoch } = getVirtualTime(
       nowMs,
-      modeInfo,
+      { ...modeInfo, mode: modeInfo.effectiveMode ?? modeInfo.mode },
       env.REPLAY_SPEED,
     );
 
@@ -126,8 +139,6 @@ class PriceService extends EventEmitter {
         });
       }
       this._lastEpoch = sessionEpoch;
-      // Pre-load new session candles
-      await this._preloadSession(modeInfo.sessionDate);
     }
 
     // Compute ticks for all instruments
@@ -160,13 +171,6 @@ class PriceService extends EventEmitter {
     if (ticks.length > 0) {
       this.emit('ticks', { ticks, status });
     }
-  }
-
-  /** @returns {boolean} */
-  _isLiveDataAvailable() {
-    // If we already have live ticks cached from DB, return true
-    // For now: always true (ingest job will populate; degradation handled by candle store)
-    return true;
   }
 
   /**

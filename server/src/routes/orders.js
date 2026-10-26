@@ -55,7 +55,8 @@ ordersRouter.post(
 
     // Register PENDING LIMIT with matcher and evaluate immediately
     if (order.status === 'PENDING' && order.type === 'LIMIT') {
-      await matcher.evaluateOrder(order);
+      const latest = priceService.getLatest(order.symbol);
+      await matcher.evaluateOrder(order, latest?.pricePaise, latest?.vts);
     }
 
     if (idempotent) {

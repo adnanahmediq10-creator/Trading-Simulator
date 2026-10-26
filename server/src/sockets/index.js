@@ -82,3 +82,11 @@ export function initSocketIO(httpServer) {
 }
 
 export { io };
+
+/** Close the Socket.IO server during graceful shutdown. */
+export function closeSocketIO() {
+  return new Promise((resolve) => {
+    if (!io) return resolve();
+    io.close(() => resolve());
+  });
+}
