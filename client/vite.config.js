@@ -7,12 +7,13 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:4000',
-        changeOrigin: true,
+        // Don't rewrite Origin so the server's CSRF check sees the real origin
+        changeOrigin: false,
       },
       '/socket.io': {
         target: 'http://localhost:4000',
         ws: true,
-        changeOrigin: true,
+        changeOrigin: false,
       },
     },
   },
