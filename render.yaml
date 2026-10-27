@@ -5,8 +5,8 @@ services:
     plan: free
     region: singapore
 
-    # Build: install all workspaces, then build the React client
-    buildCommand: npm ci && npm run build
+    # Build: install all workspaces including dev tools, then build the React client
+    buildCommand: npm ci --include=dev && npm run build
 
     # Start: run the Node server (serves both API and built client)
     startCommand: npm start

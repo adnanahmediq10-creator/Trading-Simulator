@@ -14,8 +14,10 @@
     "snapshot": "npm run snapshot -w server",
     "seed": "npm run seed -w server"
   },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.3.3"
+  },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.3",
     "concurrently": "^9.1.2"
   },
   "engines": {
