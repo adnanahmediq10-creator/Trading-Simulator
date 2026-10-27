@@ -1,6 +1,6 @@
 /**
- * Dashboard — main trading view.
- * Layout: IndexStrip | [WatchList | CandleChart + OrderPanel] | BottomBar
+ * Dashboard — main trading terminal view in light theme.
+ * Layout: IndexStrip | [WatchList | CandleChart + BottomDock | OrderPanel + Stats]
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
@@ -41,21 +41,18 @@ function DashboardContent() {
     queryKey: ['candles', symbol, chartInterval],
     queryFn: () => api.candles(symbol, chartInterval, 500),
     staleTime: 30_000,
-    // Live ticks keep the chart smooth; polling lets it recover if a mobile or
-    // remote network drops the socket connection. The API uses the same clock
-    // as the tick stream, so these refreshes cannot move the chart backwards.
     refetchInterval: connected ? 15_000 : 5_000,
     enabled: !!symbol,
   });
 
-  // All pending orders (for price lines on chart and bottom panel)
+  // All pending orders
   const { data: ordersData } = useQuery({
     queryKey: ['orders', 'PENDING'],
     queryFn: () => api.listOrders({ status: 'PENDING', limit: 100 }),
     refetchInterval: 15_000,
   });
 
-  // Trades for selected symbol (fill markers)
+  // Trades for selected symbol
   const { data: tradesData } = useQuery({
     queryKey: ['trades', symbol],
     queryFn: () => api.listTrades({ symbol, limit: 50 }),
@@ -73,7 +70,7 @@ function DashboardContent() {
   const cancelMutation = useMutation({
     mutationFn: api.cancelOrder,
     onSuccess: () => {
-      toast('Order cancelled', 'success');
+      toast('Order successfully cancelled', 'success');
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: ['portfolio'] });
     },
@@ -131,62 +128,84 @@ function DashboardContent() {
 
   const changePaise = tick ? tick.pricePaise - (tick.prevClosePaise ?? tick.pricePaise) : 0;
   const pnl = formatPnl(changePaise);
+  const up = changePaise >= 0;
 
   const allPendingOrders = ordersData?.orders ?? [];
   const symbolPendingOrders = allPendingOrders.filter((o) => o.symbol === symbol);
   const trades = tradesData?.trades ?? [];
   const positions = portfolioData?.positions ?? [];
-  // Current symbol's open position (for chart overlay)
   const symbolPosition = positions.find((p) => p.symbol === symbol && p.qty > 0) ?? null;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-100 select-none">
       <Navbar />
       <StatusBar />
       <IndexStrip />
 
-      {/* Main trading area */}
-      <div className="flex flex-1 overflow-hidden" style={{ minHeight: 0 }}>
-        {/* Left: WatchList */}
-        <aside className="w-60 shrink-0 border-r border-gray-800 flex flex-col overflow-hidden bg-[#0d1117]">
-          <div className="px-3 py-2 border-b border-gray-800">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Market Watch</h2>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <WatchList selectedSymbol={symbol} onSelectSymbol={setSymbol} />
-          </div>
+      {/* Main Multi-Panel Workspace */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* Left Sidebar: Market Watch */}
+        <aside className="w-64 shrink-0 border-r border-slate-200 flex flex-col overflow-hidden bg-white shadow-2xs">
+          <WatchList selectedSymbol={symbol} onSelectSymbol={setSymbol} />
         </aside>
 
-        {/* Centre: Chart + bottom panel */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#0a0e1a] min-w-0">
-          {/* Symbol header */}
-          <div className="flex items-baseline gap-3 px-4 pt-3 pb-1 flex-wrap">
-            <h1 className="text-xl font-bold text-white">{symbol}</h1>
+        {/* Center: Chart + Bottom Tabbed Dock */}
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0 bg-slate-100/60">
+          {/* Symbol Quote Header Bar */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 bg-white flex-wrap gap-2 shadow-2xs">
+            <div className="flex items-baseline gap-3">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight">{symbol}</h1>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold border border-slate-200">
+                  NSE
+                </span>
+              </div>
+
+              {tick && (
+                <>
+                  <span className="text-2xl font-mono font-bold text-slate-900 tabular-nums tracking-tight">
+                    {formatINR(tick.pricePaise)}
+                  </span>
+
+                  <div
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono font-bold tabular-nums ${
+                      up
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                    }`}
+                  >
+                    <span>{up ? '▲' : '▼'}</span>
+                    <span>{pnl.text}</span>
+                    <span>
+                      ({up ? '+' : ''}
+                      {tick.prevClosePaise
+                        ? ((changePaise / tick.prevClosePaise) * 100).toFixed(2)
+                        : '0.00'}
+                      %)
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Price Feed Source Badge */}
             {tick && (
-              <>
-                <span className="text-2xl font-mono font-semibold text-white">
-                  {formatINR(tick.pricePaise)}
-                </span>
-                <span className={`text-sm font-medium ${pnl.cls}`}>{pnl.text}</span>
-                <span className={`text-xs ${pnl.cls}`}>
-                  ({changePaise >= 0 ? '+' : ''}
-                  {tick.prevClosePaise
-                    ? ((changePaise / tick.prevClosePaise) * 100).toFixed(2)
-                    : 0}
-                  %)
-                </span>
-                <span className={`text-xs badge ${
-                  tick.source === 'db' ? 'badge-blue' :
-                  tick.source === 'snapshot' ? 'badge-amber' : 'badge-gray'
-                }`}>
-                  {tick.source}
-                </span>
-              </>
+              <span
+                className={`text-[10px] font-mono uppercase font-bold px-2 py-0.5 rounded border ${
+                  tick.source === 'db'
+                    ? 'bg-sky-50 text-sky-700 border-sky-200'
+                    : tick.source === 'snapshot'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}
+              >
+                Feed: {tick.source}
+              </span>
             )}
           </div>
 
-          {/* Chart — takes 60% of remaining height */}
-          <div className="flex-1 min-h-0 px-3 pb-1">
+          {/* Interactive Candlestick Chart Area */}
+          <div className="flex-1 min-h-0 p-3 pb-1">
             {candleLoading ? (
               <ChartSkeleton />
             ) : (
@@ -204,27 +223,37 @@ function DashboardContent() {
             )}
           </div>
 
-          {/* Bottom tabs: Positions | Orders */}
-          <div className="border-t border-gray-800 bg-[#0d1117]" style={{ maxHeight: '30%', minHeight: 120 }}>
-            <div className="flex items-center gap-0 border-b border-gray-800">
+          {/* Bottom Dock: Positions | Orders */}
+          <div className="border-t border-slate-200 bg-white flex flex-col shadow-2xs" style={{ height: '32%', minHeight: 130 }}>
+            {/* Dock Header Tabs */}
+            <div className="flex items-center border-b border-slate-200 px-2 bg-slate-50">
               {BOTTOM_TABS.map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setBottomTab(tab)}
-                  className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+                  className={`px-4 py-2 text-xs font-bold transition-all border-b-2 -mb-px flex items-center gap-1.5 ${
                     bottomTab === tab
-                      ? 'border-sky-500 text-sky-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-300'
+                      ? 'border-sky-600 text-sky-700 bg-white'
+                      : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/70'
                   }`}
                 >
-                  {tab}
+                  <span>{tab}</span>
                   {tab === 'Orders' && allPendingOrders.length > 0 && (
-                    <span className="ml-1.5 badge-amber text-xs">{allPendingOrders.length}</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                      {allPendingOrders.length}
+                    </span>
+                  )}
+                  {tab === 'Positions' && positions.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                      {positions.length}
+                    </span>
                   )}
                 </button>
               ))}
             </div>
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(30vh - 30px)' }}>
+
+            {/* Dock Content Scroll Area */}
+            <div className="flex-1 overflow-y-auto">
               {bottomTab === 'Positions' ? (
                 <PositionsTable
                   positions={positions}
@@ -242,9 +271,9 @@ function DashboardContent() {
           </div>
         </main>
 
-        {/* Right: Order Panel */}
-        <aside className="w-72 shrink-0 border-l border-gray-800 bg-[#0d1117] overflow-y-auto">
-          <div className="p-3">
+        {/* Right Sidebar: Order Execution Ticket & Account Stats */}
+        <aside className="w-80 shrink-0 border-l border-slate-200 bg-white overflow-y-auto shadow-2xs">
+          <div className="p-3.5 space-y-3">
             <OrderPanel
               symbol={symbol}
               pricePaise={tick?.pricePaise}
@@ -257,36 +286,42 @@ function DashboardContent() {
               }}
             />
 
-            {/* Quick stats */}
+            {/* Quick Session Stats Card */}
             {tick && (
-              <div className="mt-3 card p-3 space-y-2 text-xs">
-                <div className="text-gray-400 font-medium mb-1">Session</div>
+              <div className="card p-3.5 space-y-2.5 text-xs bg-white border border-slate-200 shadow-2xs">
+                <div className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                  Market Statistics
+                </div>
                 {[
-                  ['Open', tick.dayOpenPaise],
+                  ['Day Open', tick.dayOpenPaise],
                   ['Prev Close', tick.prevClosePaise],
-                  ['LTP', tick.pricePaise],
+                  ['Last Traded', tick.pricePaise],
                 ].map(([label, val]) => (
-                  <div key={label} className="flex justify-between">
-                    <span className="text-gray-500">{label}</span>
-                    <span className="font-mono text-white">{val ? formatINR(val) : '—'}</span>
+                  <div key={label} className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">{label}</span>
+                    <span className="font-mono font-bold text-slate-900 tabular-nums">
+                      {val ? formatINR(val) : '—'}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Cash available */}
+            {/* Account Buying Power Card */}
             {portfolioData && (
-              <div className="mt-3 card p-3 text-xs">
-                <div className="text-gray-400 font-medium mb-2">Account</div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Available Cash</span>
-                  <span className="font-mono text-white">
+              <div className="card p-3.5 text-xs space-y-2 bg-white border border-slate-200 shadow-2xs">
+                <div className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                  Account Summary
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Available Cash</span>
+                  <span className="font-mono font-bold text-slate-900 tabular-nums">
                     {formatINR((portfolioData.cashPaise ?? 0) - (portfolioData.reservedCashPaise ?? 0))}
                   </span>
                 </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-gray-500">Equity</span>
-                  <span className="font-mono text-white">
+                <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                  <span className="text-slate-500 font-medium">Total Equity</span>
+                  <span className="font-mono font-bold text-sky-700 tabular-nums">
                     {formatINR(portfolioData.totals?.equityPaise ?? 0)}
                   </span>
                 </div>

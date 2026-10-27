@@ -20,23 +20,28 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#0a0e1a] flex flex-col items-center justify-center text-center p-6">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h1 className="text-2xl font-bold text-white mb-2">Something went wrong</h1>
-          <p className="text-gray-400 text-sm mb-2 max-w-sm">
-            {this.state.error?.message ?? 'An unexpected error occurred.'}
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-center p-6 select-none">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-3xl mb-5 shadow-sm">
+            ⚠️
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2 tracking-tight">
+            Terminal Execution Fault
+          </h1>
+          <p className="text-slate-500 text-xs mb-4 max-w-sm leading-relaxed font-medium">
+            {this.state.error?.message ?? 'An unexpected render error occurred in this view.'}
           </p>
-          <p className="text-gray-600 text-xs mb-8 max-w-md font-mono bg-gray-900 p-3 rounded-lg">
-            {this.state.error?.stack?.split('\n')[0]}
-          </p>
+          <div className="text-slate-600 text-xs mb-6 max-w-lg font-mono bg-white border border-slate-200 p-3.5 rounded-xl text-left overflow-x-auto shadow-2xs">
+            <span className="text-rose-600 font-semibold">Error: </span>
+            {this.state.error?.stack?.split('\n')[0] ?? 'Unknown error'}
+          </div>
           <button
-            className="btn-primary px-6"
+            className="btn-primary px-6 py-2.5 text-xs font-bold"
             onClick={() => {
               this.setState({ hasError: false, error: null });
               window.location.href = '/';
             }}
           >
-            Reload App
+            Reload Terminal
           </button>
         </div>
       );

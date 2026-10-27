@@ -1,5 +1,5 @@
 /**
- * CandleChart — lightweight-charts 4.x candlestick chart with:
+ * CandleChart — lightweight-charts 4.x candlestick chart with light theme styling:
  *  - Candlestick + volume series
  *  - Live 1-second tick updates
  *  - Pending limit order price lines
@@ -28,29 +28,29 @@ const INTERVAL_MS = {
 
 const CHART_OPTIONS = {
   layout: {
-    background: { color: '#0f1623' },
-    textColor: '#9ca3af',
-    fontFamily: "'JetBrains Mono', 'Fira Mono', monospace",
+    background: { color: '#ffffff' },
+    textColor: '#475569',
+    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
     fontSize: 11,
   },
   grid: {
-    vertLines: { color: '#1a2030' },
-    horzLines: { color: '#1a2030' },
+    vertLines: { color: '#f1f5f9' },
+    horzLines: { color: '#f1f5f9' },
   },
   rightPriceScale: {
-    borderColor: '#374151',
+    borderColor: '#e2e8f0',
     scaleMargins: { top: 0.1, bottom: 0.28 },
   },
   timeScale: {
-    borderColor: '#374151',
+    borderColor: '#e2e8f0',
     timeVisible: true,
     secondsVisible: false,
     fixLeftEdge: false,
     fixRightEdge: false,
   },
   crosshair: {
-    vertLine: { color: '#4b5563', style: 0 },
-    horzLine: { color: '#4b5563', style: 0 },
+    vertLine: { color: '#0284c7', style: 3 },
+    horzLine: { color: '#0284c7', style: 3 },
   },
   handleScroll: { mouseWheel: true, pressedMouseMove: true },
   handleScale: { mouseWheel: true, pinch: true },
@@ -88,7 +88,7 @@ function PositionOverlay({ avgCostPaise, qty, currentPricePaise, y, onClose }) {
     <div
       style={{
         position: 'absolute',
-        right: 66, // leave room for price axis (~60px wide)
+        right: 68,
         top: Math.round(y),
         transform: 'translateY(-50%)',
         zIndex: 20,
@@ -96,28 +96,23 @@ function PositionOverlay({ avgCostPaise, qty, currentPricePaise, y, onClose }) {
       }}
     >
       <div
-        className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-xs font-mono shadow-lg ${
+        className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border text-xs font-mono shadow-md backdrop-blur-md ${
           isProfit
-            ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-300'
-            : 'bg-red-950/95 border-red-500/60 text-red-300'
+            ? 'bg-emerald-50/95 border-emerald-500/70 text-emerald-800'
+            : 'bg-rose-50/95 border-rose-500/70 text-rose-800'
         }`}
       >
-        {/* Quantity */}
-        <span className="text-gray-400 font-medium">{qty}×</span>
-
-        {/* Live P&L */}
-        <span className="font-semibold">
+        <span className="text-slate-500 font-semibold">{qty}×</span>
+        <span className="font-bold tabular-nums">
           {isProfit ? '+' : ''}₹{pnlRupees}
         </span>
-
-        {/* Quick exit button */}
         <button
           onClick={onClose}
-          title="Close position at market price"
-          className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[10px] transition-colors ${
+          title="Close position immediately at market price"
+          className={`ml-0.5 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[10px] transition-all ${
             isProfit
-              ? 'text-emerald-400 hover:bg-emerald-700/60 hover:text-white'
-              : 'text-red-400 hover:bg-red-700/60 hover:text-white'
+              ? 'text-emerald-700 hover:bg-emerald-600 hover:text-white'
+              : 'text-rose-700 hover:bg-rose-600 hover:text-white'
           }`}
         >
           ✕
@@ -134,22 +129,17 @@ export default function CandleChart({
   interval,
   onIntervalChange,
   pendingOrders = [],
-  position = null,       // { qty, avgCostPaise, symbol } — null if no position
-  onClosePosition = null, // fn(position) — called on quick exit
+  position = null,
+  onClosePosition = null,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const volumeRef = useRef(null);
-  // Map orderId -> price line reference (for pending limit orders)
   const priceLinesRef = useRef(new Map());
-  // Single price line for position avg cost
   const posLineRef = useRef(null);
-  // Last bar bucket index for detecting rollover
   const lastBucketRef = useRef(null);
-  // Debounce refetch timer
   const refetchTimerRef = useRef(null);
-  // Overlay Y coordinate
   const [overlayY, setOverlayY] = useState(null);
 
   const { getTick } = useTicks();
@@ -168,10 +158,10 @@ export default function CandleChart({
     });
 
     const candleSeries = chart.addCandlestickSeries({
-      upColor: '#22c55e',
-      downColor: '#ef4444',
-      borderUpColor: '#22c55e',
-      borderDownColor: '#ef4444',
+      upColor: '#16a34a',
+      downColor: '#dc2626',
+      borderUpColor: '#16a34a',
+      borderDownColor: '#dc2626',
       wickUpColor: '#16a34a',
       wickDownColor: '#dc2626',
     });
@@ -179,7 +169,7 @@ export default function CandleChart({
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
       priceScaleId: 'vol',
-      color: '#1f2937',
+      color: '#e2e8f0',
       lastValueVisible: false,
       priceLineVisible: false,
     });
@@ -191,7 +181,6 @@ export default function CandleChart({
     seriesRef.current = candleSeries;
     volumeRef.current = volumeSeries;
 
-    // ResizeObserver for responsive sizing
     const ro = new ResizeObserver(() => {
       if (!containerRef.current) return;
       chart.applyOptions({
@@ -218,7 +207,6 @@ export default function CandleChart({
   useEffect(() => {
     if (!seriesRef.current) return;
 
-    // Clear existing pending price lines when data changes
     priceLinesRef.current.forEach((line) => {
       try { seriesRef.current?.removePriceLine(line); } catch { /* ignore */ }
     });
@@ -255,7 +243,6 @@ export default function CandleChart({
   useEffect(() => {
     if (!seriesRef.current) return;
 
-    // Remove old position line
     if (posLineRef.current) {
       try { seriesRef.current.removePriceLine(posLineRef.current); } catch { /* ignore */ }
       posLineRef.current = null;
@@ -265,16 +252,16 @@ export default function CandleChart({
       const avgRupees = positionAvgCostPaise / 100;
       posLineRef.current = seriesRef.current.createPriceLine({
         price: avgRupees,
-        color: '#f59e0b',     // amber — distinct from buy/sell lines
+        color: '#d97706',
         lineWidth: 1,
-        lineStyle: 0,          // solid
+        lineStyle: 0,
         axisLabelVisible: true,
         title: `AVG`,
       });
     }
   }, [positionAvgCostPaise, positionQty, positionSymbol]);
 
-  // ── Overlay Y coordinate — update on chart scroll/zoom/tick ──────────────
+  // ── Overlay Y coordinate ──────────────────────────────────────────────────
   const updateOverlayY = useCallback(() => {
     if (!seriesRef.current || !position || position.qty <= 0) {
       setOverlayY(null);
@@ -288,13 +275,11 @@ export default function CandleChart({
     }
   }, [position]);
 
-  // Subscribe to chart events + poll for smooth updates
   useEffect(() => {
     updateOverlayY();
     if (!chartRef.current) return;
 
     chartRef.current.timeScale().subscribeVisibleTimeRangeChange(updateOverlayY);
-    // Poll every 300ms to keep overlay synced with price scale movements
     const id = setInterval(updateOverlayY, 300);
 
     return () => {
@@ -338,7 +323,6 @@ export default function CandleChart({
         // Ignore out-of-order updates
       }
 
-      // Update overlay Y after price scale may have shifted
       updateOverlayY();
     }
 
@@ -379,9 +363,9 @@ export default function CandleChart({
       try {
         const line = seriesRef.current.createPriceLine({
           price: order.limitPricePaise / 100,
-          color: order.side === 'BUY' ? '#22c55e' : '#ef4444',
+          color: order.side === 'BUY' ? '#16a34a' : '#dc2626',
           lineWidth: 1,
-          lineStyle: 2, // dashed
+          lineStyle: 2,
           axisLabelVisible: true,
           title: `${order.side} LMT ${order.qty}`,
         });
@@ -390,35 +374,39 @@ export default function CandleChart({
     }
   }, [pendingOrders]);
 
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Interval selector */}
-      <div className="flex items-center gap-1 mb-2" role="tablist" aria-label="Chart interval">
-        {INTERVALS.map((iv) => (
-          <button
-            key={iv}
-            role="tab"
-            aria-selected={iv === interval}
-            onClick={() => onIntervalChange?.(iv)}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              iv === interval
-                ? 'bg-sky-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
-          >
-            {iv}
-          </button>
-        ))}
+    <div className="flex flex-col h-full bg-white rounded-xl border border-slate-200 p-2.5 overflow-hidden shadow-2xs">
+      {/* Interval Selector Toolbar */}
+      <div className="flex items-center justify-between mb-2 px-1" role="tablist" aria-label="Chart interval">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+          {INTERVALS.map((iv) => (
+            <button
+              key={iv}
+              role="tab"
+              aria-selected={iv === interval}
+              onClick={() => onIntervalChange?.(iv)}
+              className={`px-3 py-1 rounded-md text-xs font-semibold font-mono transition-all ${
+                iv === interval
+                  ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/30'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              {iv}
+            </button>
+          ))}
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+          <span>Lightweight Charts™</span>
+        </div>
       </div>
 
-      {/* Chart container — position:relative for overlay */}
+      {/* Chart Canvas Container */}
       <div
         ref={containerRef}
         className="flex-1 rounded-lg overflow-hidden relative"
         style={{ minHeight: 320 }}
       >
-        {/* Position P&L Overlay */}
         <PositionOverlay
           avgCostPaise={position?.avgCostPaise}
           qty={position?.qty ?? 0}

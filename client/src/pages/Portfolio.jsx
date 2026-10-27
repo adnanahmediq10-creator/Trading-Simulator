@@ -1,5 +1,5 @@
 /**
- * Portfolio page — positions, P&L, equity summary, and account reset.
+ * Portfolio page — positions, P&L, equity summary, and account reset in light theme.
  */
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -28,7 +28,7 @@ function PortfolioContent() {
   const resetMutation = useMutation({
     mutationFn: api.resetAccount,
     onSuccess: () => {
-      toast('Account reset successfully.', 'success', 6000);
+      toast('Account successfully reset to starting balance', 'success', 6000);
       setShowResetConfirm(false);
       qc.invalidateQueries({ queryKey: ['portfolio'] });
       qc.invalidateQueries({ queryKey: ['orders'] });
@@ -51,21 +51,23 @@ function PortfolioContent() {
 
   const portfolio = data;
   const totals = portfolio?.totals;
-  // Show positions with qty > 0 or realizedPnl != 0
   const positions = portfolio?.positions?.filter((p) => p.qty > 0) ?? [];
   const pnl = totals ? formatPnl(totals.totalPnlPaise) : null;
   const unrealPnl = totals ? formatPnl(totals.unrealizedPnlPaise) : null;
   const realPnl = totals ? formatPnl(totals.realizedPnlPaise) : null;
+  const isNetProfit = totals ? totals.totalPnlPaise >= 0 : true;
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto w-full px-4 py-6">
+      <div className="max-w-6xl mx-auto w-full px-4 py-8">
         <EmptyState
           icon="⚠️"
-          title="Failed to load portfolio"
-          description={error.message ?? 'Network error'}
+          title="Portfolio Synchronization Failure"
+          description={error.message ?? 'Network error connecting to the portfolio service.'}
           action={
-            <button className="btn-primary" onClick={() => refetch()}>Retry</button>
+            <button className="btn-primary" onClick={() => refetch()}>
+              Retry Connection
+            </button>
           }
         />
       </div>
@@ -73,45 +75,60 @@ function PortfolioContent() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto w-full px-4 py-6 space-y-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold text-white">Portfolio</h1>
+    <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6 select-none">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 pb-2 border-b border-slate-200">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Portfolio</h1>
           {pnl && (
-            <span className={`text-lg font-mono ${pnl.cls}`}>
-              {pnl.text} ({formatPct(totals?.totalPnlPct)})
-            </span>
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-mono font-bold tabular-nums ${
+                isNetProfit
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}
+            >
+              <span>{isNetProfit ? '▲' : '▼'}</span>
+              <span>{pnl.text}</span>
+              <span>({formatPct(totals?.totalPnlPct)})</span>
+            </div>
           )}
         </div>
         <button
           id="reset-account-btn"
           onClick={() => setShowResetConfirm(true)}
-          className="btn-ghost text-xs text-red-400 hover:text-red-300 border-red-900/50"
+          className="btn-ghost text-xs text-rose-600 hover:text-rose-700 border-rose-200 hover:bg-rose-50 self-start sm:self-auto font-semibold"
         >
-          Reset Account
+          Reset Simulation Balance
         </button>
       </div>
 
-      {/* Reset confirm dialog */}
+      {/* Reset Confirmation Modal */}
       {showResetConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="card p-6 max-w-sm w-full mx-4 space-y-4">
-            <h2 className="text-lg font-bold text-white">Reset Account?</h2>
-            <p className="text-gray-400 text-sm">
-              This will delete all your orders, positions, and trades and restore your cash to
-              {` ${formatINR(portfolio?.startingCashPaise)}.`} This cannot be undone.
-            </p>
-            <div className="flex gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="card-elevated p-6 max-w-sm w-full space-y-4 shadow-xl border-slate-200 animate-slide-up bg-white">
+            <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-2xl">
+              ⚠️
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">Reset Simulation Account?</h2>
+              <p className="text-slate-600 text-xs mt-1 leading-relaxed">
+                This action will delete all existing orders, positions, and trades, restoring your buying power to
+                <span className="font-bold text-slate-900 font-mono"> {formatINR(portfolio?.startingCashPaise)}. </span>
+                This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
               <button
                 onClick={() => resetMutation.mutate()}
                 disabled={resetMutation.isPending}
-                className="btn-danger flex-1 disabled:opacity-50"
+                className="btn-danger flex-1 py-2 text-xs font-bold"
               >
-                {resetMutation.isPending ? 'Resetting…' : 'Yes, Reset'}
+                {resetMutation.isPending ? 'Resetting…' : 'Yes, Reset Funds'}
               </button>
               <button
                 onClick={() => setShowResetConfirm(false)}
-                className="btn-ghost flex-1"
+                className="btn-ghost flex-1 py-2 text-xs"
               >
                 Cancel
               </button>
@@ -120,68 +137,76 @@ function PortfolioContent() {
         </div>
       )}
 
-      {/* Summary cards */}
+      {/* KPI Metric Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="card p-4 h-24 skeleton" />)}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {[...Array(4)].map((_, i) => <div key={i} className="card p-5 h-24 skeleton" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           <SummaryCard
-            label="Equity"
+            label="Total Equity"
             value={formatINRCompact(totals?.equityPaise)}
-            sub={`Start: ${formatINRCompact(portfolio?.startingCashPaise)}`}
+            sub={`Baseline: ${formatINRCompact(portfolio?.startingCashPaise)}`}
+            accentColor="text-sky-700"
           />
           <SummaryCard
-            label="Cash"
+            label="Available Cash"
             value={formatINRCompact(portfolio?.cashPaise)}
             sub={`Reserved: ${formatINRCompact(portfolio?.reservedCashPaise)}`}
+            accentColor="text-slate-900"
           />
           <SummaryCard
             label="Unrealised P&L"
             value={unrealPnl?.text}
             cls={unrealPnl?.cls}
+            isPnl
           />
           <SummaryCard
             label="Realised P&L"
             value={realPnl?.text}
             cls={realPnl?.cls}
+            isPnl
           />
         </div>
       )}
 
-      {/* Positions table */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-          <h2 className="font-semibold text-white">Open Positions</h2>
-          <span className="text-xs text-gray-500">{positions.length} position{positions.length !== 1 ? 's' : ''}</span>
+      {/* Holdings & Positions Table */}
+      <div className="card overflow-hidden bg-white border border-slate-200 shadow-2xs">
+        <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold text-slate-900 text-sm tracking-tight">Active Holdings</h2>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
+              {positions.length}
+            </span>
+          </div>
+          <span className="text-xs text-slate-500 font-medium">Mark-to-Market Realtime</span>
         </div>
 
         {isLoading ? (
-          <div className="p-4"><TableSkeleton rows={4} cols={7} /></div>
+          <div className="p-5"><TableSkeleton rows={4} cols={7} /></div>
         ) : positions.length === 0 ? (
           <EmptyState
             icon="📊"
-            title="No open positions"
-            description="Buy some shares to see your portfolio here."
+            title="No securities in portfolio"
+            description="Acquire shares through the market terminal to track positions and P&L here."
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-gray-500 border-b border-gray-800">
-                  <th className="text-left px-4 py-2">Symbol</th>
-                  <th className="text-right px-4 py-2">Qty</th>
-                  <th className="text-right px-4 py-2">Avg Cost</th>
-                  <th className="text-right px-4 py-2">LTP</th>
-                  <th className="text-right px-4 py-2">Market Value</th>
-                  <th className="text-right px-4 py-2">Unrealised P&L</th>
-                  <th className="text-right px-4 py-2">Day Change</th>
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-slate-50">
+                <tr className="text-slate-500 border-b border-slate-200 font-semibold text-[11px]">
+                  <th className="px-5 py-3">Symbol</th>
+                  <th className="px-5 py-3 text-right">Holding Qty</th>
+                  <th className="px-5 py-3 text-right">Avg Cost</th>
+                  <th className="px-5 py-3 text-right">LTP</th>
+                  <th className="px-5 py-3 text-right">Market Value</th>
+                  <th className="px-5 py-3 text-right">Unrealised P&L</th>
+                  <th className="px-5 py-3 text-right">Day Change</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {positions.map((pos) => {
-                  // Override LTP with live tick for real-time display
                   const tick = getTick(pos.symbol);
                   const ltpPaise = tick?.pricePaise ?? pos.ltpPaise;
                   const marketValue = ltpPaise * pos.qty;
@@ -195,39 +220,61 @@ function PortfolioContent() {
 
                   const pnlFmt = formatPnl(unrealPnlPaise);
                   const day = formatPnl(dayChangePaise);
+                  const isProfit = unrealPnlPaise >= 0;
+
                   return (
-                    <tr key={pos.symbol} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-white">{pos.symbol}</div>
-                        <div className="text-xs text-gray-500">{pos.name}</div>
+                    <tr key={pos.symbol} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="font-bold text-slate-900 tracking-tight">{pos.symbol}</div>
+                        <div className="text-[10px] text-slate-500 font-medium truncate max-w-[140px] mt-0.5">
+                          {pos.name}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">
+                      <td className="px-5 py-3.5 text-right font-mono font-bold text-slate-900 tabular-nums">
                         {pos.qty}
                         {pos.reservedQty > 0 && (
-                          <div className="text-xs text-amber-400">({pos.reservedQty} rsvd)</div>
+                          <div className="text-[10px] text-amber-700 font-semibold">({pos.reservedQty} locked)</div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">{formatINR(pos.avgCostPaise)}</td>
-                      <td className="px-4 py-3 text-right font-mono">
+                      <td className="px-5 py-3.5 text-right font-mono text-slate-700 tabular-nums font-semibold">
+                        {formatINR(pos.avgCostPaise)}
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-mono font-bold text-slate-900 tabular-nums">
                         {formatINR(ltpPaise)}
-                        {pos.priceStale && <span className="text-xs text-amber-400 ml-1">⚠</span>}
+                        {pos.priceStale && <span className="text-[10px] text-amber-600 ml-1 font-bold" title="Price stale">⚠</span>}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">{formatINR(marketValue)}</td>
-                      <td className={`px-4 py-3 text-right font-mono ${pnlFmt.cls}`}>
-                        {pnlFmt.text}
-                        <div className="text-xs">({unrealPct >= 0 ? '+' : ''}{unrealPct.toFixed(2)}%)</div>
+                      <td className="px-5 py-3.5 text-right font-mono font-bold text-slate-800 tabular-nums">
+                        {formatINR(marketValue)}
                       </td>
-                      <td className={`px-4 py-3 text-right font-mono ${day.cls}`}>{day.text}</td>
+                      <td className="px-5 py-3.5 text-right font-mono tabular-nums">
+                        <span
+                          className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded text-[11px] ${
+                            isProfit
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}
+                        >
+                          {pnlFmt.text}
+                          <span className="text-[10px] opacity-80">
+                            ({unrealPct >= 0 ? '+' : ''}{unrealPct.toFixed(2)}%)
+                          </span>
+                        </span>
+                      </td>
+                      <td className={`px-5 py-3.5 text-right font-mono font-bold tabular-nums ${day.cls}`}>
+                        {day.text}
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
               {totals && (
-                <tfoot className="border-t border-gray-700">
-                  <tr className="text-xs font-semibold text-gray-300">
-                    <td className="px-4 py-2" colSpan={4}>Total</td>
-                    <td className="px-4 py-2 text-right font-mono">{formatINR(totals.marketValuePaise)}</td>
-                    <td className={`px-4 py-2 text-right font-mono ${formatPnl(totals.unrealizedPnlPaise).cls}`}>
+                <tfoot className="border-t border-slate-200 bg-slate-50">
+                  <tr className="text-xs font-bold text-slate-700">
+                    <td className="px-5 py-3" colSpan={4}>Aggregate Portfolio Value</td>
+                    <td className="px-5 py-3 text-right font-mono font-bold text-slate-900 tabular-nums">
+                      {formatINR(totals.marketValuePaise)}
+                    </td>
+                    <td className={`px-5 py-3 text-right font-mono font-bold tabular-nums ${formatPnl(totals.unrealizedPnlPaise).cls}`}>
                       {formatPnl(totals.unrealizedPnlPaise).text}
                     </td>
                     <td />
@@ -239,11 +286,16 @@ function PortfolioContent() {
         )}
       </div>
 
-      {/* Realised P&L summary if any */}
+      {/* Closed Positions Realised P&L Banner */}
       {totals?.realizedPnlPaise !== 0 && totals?.realizedPnlPaise != null && (
-        <div className="card p-4 flex items-center justify-between">
-          <span className="text-sm text-gray-400">Total Realised P&L (all closed trades)</span>
-          <span className={`font-mono font-semibold ${formatPnl(totals.realizedPnlPaise).cls}`}>
+        <div className="card p-4 flex items-center justify-between border-slate-200 bg-white">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-600 font-bold uppercase tracking-wider">
+              Cumulative Realised P&L
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium">(All Closed Cycles)</span>
+          </div>
+          <span className={`font-mono font-bold text-sm tabular-nums ${formatPnl(totals.realizedPnlPaise).cls}`}>
             {formatPnl(totals.realizedPnlPaise).text}
           </span>
         </div>
@@ -255,7 +307,7 @@ function PortfolioContent() {
 export default function Portfolio() {
   return (
     <ToastProvider>
-      <div className="flex flex-col min-h-screen bg-[#0a0e1a]">
+      <div className="flex flex-col min-h-screen bg-slate-50">
         <Navbar />
         <StatusBar />
         <PortfolioContent />
@@ -264,12 +316,14 @@ export default function Portfolio() {
   );
 }
 
-function SummaryCard({ label, value, sub, cls }) {
+function SummaryCard({ label, value, sub, cls, accentColor }) {
   return (
-    <div className="card p-4">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className={`text-lg font-mono font-semibold ${cls ?? 'text-white'}`}>{value ?? '—'}</div>
-      {sub && <div className="text-xs text-gray-600 mt-0.5">{sub}</div>}
+    <div className="card p-4 space-y-1 bg-white border border-slate-200 shadow-2xs">
+      <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">{label}</div>
+      <div className={`text-xl font-mono font-bold tracking-tight tabular-nums ${cls ?? accentColor ?? 'text-slate-900'}`}>
+        {value ?? '—'}
+      </div>
+      {sub && <div className="text-[10px] text-slate-400 font-mono mt-0.5 font-medium">{sub}</div>}
     </div>
   );
 }

@@ -22,39 +22,51 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden select-none">
+      {/* Background Soft Glow Gradients */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-sky-900/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-violet-900/20 rounded-full blur-3xl" />
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-sky-200/40 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-indigo-200/40 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-3">📈</div>
-          <h1 className="text-2xl font-bold text-white">TradeVirtual</h1>
-          <p className="text-gray-400 mt-1 text-sm">Create your trading account</p>
+        {/* Brand Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 items-center justify-center text-2xl shadow-lg shadow-sky-500/20 mb-3.5">
+            <span className="text-white">📈</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center justify-center gap-1.5">
+            TradeVirtual
+            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 border border-sky-300">
+              PRO
+            </span>
+          </h1>
+          <p className="text-slate-500 mt-1 text-xs font-medium">Initialize your risk-free simulated trading desk</p>
         </div>
 
-        {/* Features strip */}
-        <div className="grid grid-cols-3 gap-2 mb-5">
+        {/* Feature Value Props */}
+        <div className="grid grid-cols-3 gap-2.5 mb-5">
           {[
             { icon: '💰', text: '₹10L Virtual Funds' },
-            { icon: '📊', text: 'Live NSE Data' },
-            { icon: '🔒', text: 'Risk Free' },
+            { icon: '📊', text: 'Live NSE Ticks' },
+            { icon: '🛡️', text: 'Zero Risk' },
           ].map(({ icon, text }) => (
-            <div key={text} className="card p-2.5 text-center">
-              <div className="text-lg">{icon}</div>
-              <div className="text-xs text-gray-400 mt-1">{text}</div>
+            <div key={text} className="card p-2.5 text-center border-slate-200 bg-white shadow-2xs">
+              <div className="text-base">{icon}</div>
+              <div className="text-[11px] font-bold text-slate-700 mt-1">{text}</div>
             </div>
           ))}
         </div>
 
-        <div className="card p-6 shadow-2xl">
-          <h2 className="text-lg font-semibold text-white mb-5">Create account</h2>
+        {/* Auth Card */}
+        <div className="card-elevated p-7 shadow-lg border-slate-200 bg-white">
+          <h2 className="text-base font-bold text-slate-900 mb-5 tracking-tight">Create Trader Account</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4" id="register-form">
             <div>
-              <label className="text-xs text-gray-400 mb-1 block" htmlFor="name">Full Name</label>
+              <label className="text-xs text-slate-700 font-semibold mb-1.5 block" htmlFor="name">
+                Full Name
+              </label>
               <input
                 id="name"
                 type="text"
@@ -69,27 +81,29 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="text-xs text-gray-400 mb-1 block" htmlFor="email">Email</label>
+              <label className="text-xs text-slate-700 font-semibold mb-1.5 block" htmlFor="email">
+                Email Address
+              </label>
               <input
                 id="email"
                 type="email"
                 className="input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="trader@example.com"
                 required
                 autoComplete="email"
               />
             </div>
 
             <div>
-              <label className="text-xs text-gray-400 mb-1 block" htmlFor="password">
-                Password <span className="text-gray-600">(min 8 chars, 1 letter, 1 number)</span>
+              <label className="text-xs text-slate-700 font-semibold mb-1.5 block" htmlFor="password">
+                Password <span className="text-slate-400 font-normal font-mono text-[10px]">(min 8 chars, 1 letter, 1 number)</span>
               </label>
               <input
                 id="password"
                 type="password"
-                className="input"
+                className="input font-mono"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -100,8 +114,9 @@ export default function Register() {
             </div>
 
             {error && (
-              <div className="bg-red-900/30 border border-red-700/50 text-red-400 text-sm px-3 py-2 rounded-lg">
-                {error}
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs px-3 py-2.5 rounded-lg flex items-center gap-2 font-medium">
+                <span>⚠️</span>
+                <span>{error}</span>
               </div>
             )}
 
@@ -109,22 +124,22 @@ export default function Register() {
               id="register-submit"
               type="submit"
               disabled={registerPending}
-              className="btn-primary w-full py-3"
+              className="btn-primary w-full py-2.5 text-xs font-bold uppercase tracking-wider mt-2 shadow-md shadow-sky-600/20"
             >
-              {registerPending ? 'Creating account…' : 'Create account & Start Trading'}
+              {registerPending ? 'Creating Account…' : 'Start Trading'}
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-5">
+          <p className="text-center text-xs text-slate-500 mt-6 font-medium">
             Already have an account?{' '}
-            <Link to="/login" className="text-sky-400 hover:text-sky-300 font-medium">
+            <Link to="/login" className="text-sky-600 hover:text-sky-700 font-bold underline underline-offset-2">
               Sign in
             </Link>
           </p>
         </div>
 
-        <p className="text-center text-xs text-gray-600 mt-4">
-          Simulation only. Not financial advice.
+        <p className="text-center text-[11px] text-slate-400 mt-5 font-medium">
+          Simulation environment for educational and training purposes only.
         </p>
       </div>
     </div>

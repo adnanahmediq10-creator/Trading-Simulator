@@ -13,31 +13,64 @@ export default function StatusBar() {
 
   let modeBadge = null;
   if (mode === 'DELAYED_LIVE') {
-    modeBadge = <span className="badge-blue">🔵 Delayed 15 min</span>;
+    modeBadge = (
+      <span className="badge-blue text-[10px] py-0.5 px-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+        NSE Delayed (15m)
+      </span>
+    );
   } else if (mode === 'DEMO_REPLAY') {
     modeBadge = (
-      <span className="badge-amber">
-        🟡 Demo replay · {sessionDate}
-        {speed && speed > 1 ? ` · ${speed}×` : ''}
+      <span className="badge-amber text-[10px] py-0.5 px-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        Demo Replay · {sessionDate}
+        {speed && speed > 1 ? ` · ${speed}× Speed` : ''}
       </span>
     );
   }
 
   let connBadge;
   if (reconnecting) {
-    connBadge = <span className="badge-amber">⟳ Reconnecting…</span>;
+    connBadge = (
+      <span className="badge-amber text-[10px] py-0.5 px-2 animate-pulse">
+        ⟳ Reconnecting…
+      </span>
+    );
   } else if (connected) {
-    connBadge = <span className="badge-green">● Live</span>;
+    connBadge = (
+      <span className="badge-green text-[10px] py-0.5 px-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        Socket Synchronized
+      </span>
+    );
   } else {
-    connBadge = <span className="badge-red">○ Offline</span>;
+    connBadge = (
+      <span className="badge-red text-[10px] py-0.5 px-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+        Offline
+      </span>
+    );
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-1.5 bg-gray-900/80 border-b border-gray-800 text-xs">
-      <span className="font-mono text-gray-300">{formatVirtualTime(vts)}</span>
+    <div className="flex items-center gap-3 px-4 py-1.5 bg-slate-50 border-b border-slate-200 text-xs select-none">
+      <div className="flex items-center gap-1.5 text-slate-600 font-mono text-[11px]">
+        <span className="text-slate-400 font-semibold">IST</span>
+        <span className="text-slate-900 font-bold tabular-nums">
+          {formatVirtualTime(vts)}
+        </span>
+      </div>
+
+      <div className="h-3 w-px bg-slate-200" />
+
       {modeBadge}
       {connBadge}
-      <span className="ml-auto text-gray-600">TradeVirtual</span>
+
+      <div className="ml-auto flex items-center gap-3 text-[11px] text-slate-500 font-medium">
+        <span className="hidden sm:inline">Engine: NSE Equity Simulator</span>
+        <span className="text-slate-300">|</span>
+        <span className="text-slate-600 font-semibold">v2.4-pro</span>
+      </div>
     </div>
   );
 }

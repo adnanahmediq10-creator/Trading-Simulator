@@ -11,7 +11,14 @@ import DisclaimerBanner from './components/DisclaimerBanner.jsx';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) return <div className="flex items-center justify-center h-screen"><div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-slate-50 gap-3 select-none">
+        <div className="w-9 h-9 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs font-mono font-medium text-slate-500">Initializing Terminal Session…</span>
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 }

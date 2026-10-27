@@ -28,7 +28,7 @@ export default function IndexStrip() {
   if (indices.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-3 gap-2 px-4 py-2 bg-[#0d1117] border-b border-gray-800">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 px-4 py-2 bg-slate-100/70 border-b border-slate-200">
       {indices.map((inst) => {
         const tick = getTick(inst.symbol);
         const changePaise = tick
@@ -42,21 +42,32 @@ export default function IndexStrip() {
         return (
           <div
             key={inst.symbol}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-900/40"
+            className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors"
           >
             <div>
-              <div className="text-xs text-gray-500 font-medium">
+              <div className="text-[11px] text-slate-500 font-bold tracking-wider uppercase">
                 {INDEX_LABELS[inst.symbol] ?? inst.name}
               </div>
-              <div className="font-mono font-semibold text-sm text-white mt-0.5">
+              <div className="font-mono font-bold text-sm text-slate-900 mt-0.5 tabular-nums">
                 {tick?.pricePaise ? formatINR(tick.pricePaise) : '—'}
               </div>
             </div>
+
             {tick && (
-              <div className={`ml-auto text-right text-xs ${up ? 'pnl-pos' : 'pnl-neg'}`}>
-                <div>{up ? '▲' : '▼'} {formatPct(Math.abs(changePct))}</div>
-                <div className="text-gray-500 font-mono">
-                  {up ? '+' : ''}{formatINR(changePaise)}
+              <div
+                className={`flex flex-col items-end text-xs font-mono font-semibold px-2 py-1 rounded-md ${
+                  up
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                }`}
+              >
+                <div className="flex items-center gap-1 leading-tight tabular-nums font-bold">
+                  <span>{up ? '▲' : '▼'}</span>
+                  <span>{formatPct(Math.abs(changePct))}</span>
+                </div>
+                <div className="text-[10px] opacity-80 leading-tight mt-0.5 tabular-nums font-medium">
+                  {up ? '+' : ''}
+                  {formatINR(changePaise)}
                 </div>
               </div>
             )}
