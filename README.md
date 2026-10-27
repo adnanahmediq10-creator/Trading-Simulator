@@ -28,6 +28,10 @@ Indian retail learners who want to practise NSE trading without financial risk.
 - 📊 **Portfolio P&L** — unrealised, realised, equity, day change
 - 🔒 **httpOnly cookie auth** — JWT, origin check, rate limits
 
+## Project Demo
+
+- [Watch the screen-recorded walkthrough](https://drive.google.com/file/d/1y3_LIbjpDuSB2TaD8njN89FHiolutzaY/view?usp=sharing)
+
 ## Tech Stack
 
 | Layer | Technology |
