@@ -2,11 +2,7 @@ import { Router } from 'express';
 import { dbStateLabel } from '../db.js';
 import { priceService } from '../market/priceService.js';
 import { matcher } from '../engine/matcher.js';
-import {
-  getEffectiveMode,
-  getVirtualTime,
-  getHolidays,
-} from '../market/clock.js';
+import { getMarketClock } from '../market/marketClock.js';
 import { env } from '../config/env.js';
 
 const startTime = Date.now();
@@ -33,9 +29,8 @@ healthRouter.get('/', (_req, res) => {
   const dbDown = dbState === 'disconnected';
 
   const nowMs = Date.now();
-  const holidays = getHolidays();
-  const modeInfo = getEffectiveMode(nowMs, holidays, true);
-  const { virtualNowMs, sessionEpoch } = getVirtualTime(nowMs, modeInfo, env.REPLAY_SPEED);
+  const marketClock = getMarketClock(nowMs);
+  const { virtualNowMs, sessionEpoch } = marketClock;
 
   const tickerStatus = priceService.getStatus();
   const dataSources = priceService.getDataSources();
@@ -48,8 +43,8 @@ healthRouter.get('/', (_req, res) => {
     status: degraded ? 'degraded' : 'ok',
     uptimeSec: Math.floor((Date.now() - startTime) / 1000),
     time: new Date().toISOString(),
-    mode: modeInfo.mode,
-    effectiveMode: modeInfo.effectiveMode ?? modeInfo.mode,
+    mode: marketClock.mode,
+    effectiveMode: marketClock.effectiveMode ?? marketClock.mode,
     virtualNowMs,
     sessionEpoch,
     db: { state: dbState },

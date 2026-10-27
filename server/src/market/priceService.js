@@ -38,6 +38,8 @@ class PriceService extends EventEmitter {
     this._prevClose = new Map();
     /** @type {number|null} */
     this._lastTickAt = null;
+    /** @type {object|null} last clock used to generate broadcast ticks */
+    this._marketState = null;
     /** When DELAYED_LIVE has no Mongo candles, stay on DEMO_REPLAY. */
     this._liveUnavailable = false;
   }
@@ -95,6 +97,17 @@ class PriceService extends EventEmitter {
       running: this._running,
       lastTickAgeMs: this._lastTickAt ? Date.now() - this._lastTickAt : null,
     };
+  }
+
+  /**
+   * Return the clock currently driving broadcast prices. REST market data must
+   * use this same clock so candle history and live ticks share one timeline.
+   * @returns {object|null}
+   */
+  getMarketState() {
+    if (!this._marketState || !this._lastTickAt) return null;
+    if (Date.now() - this._lastTickAt > env.STALE_AFTER_MS) return null;
+    return this._marketState;
   }
 
   getDataSources() {
@@ -173,6 +186,7 @@ class PriceService extends EventEmitter {
       sessionDate: modeInfo.sessionDate,
       reason: modeInfo.reason,
     };
+    this._marketState = status;
 
     if (ticks.length > 0) {
       this.emit('ticks', { ticks, status });

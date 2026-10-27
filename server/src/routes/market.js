@@ -9,16 +9,11 @@ import { z } from 'zod';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { INSTRUMENTS, getInstrument } from '../config/instruments.js';
 import { priceService } from '../market/priceService.js';
-import {
-  getEffectiveMode,
-  getVirtualTime,
-  getHolidays,
-  prevTradingDay,
-  sessionOpenMs,
-} from '../market/clock.js';
+import { getHolidays, prevTradingDay, sessionOpenMs } from '../market/clock.js';
 import { getSession, getDaily } from '../market/candleStore.js';
 import { aggregate, formingDailyBar } from '../market/candles.js';
 import { formingBar } from '../market/tickGenerator.js';
+import { getMarketClock } from '../market/marketClock.js';
 import { env } from '../config/env.js';
 import { DomainError } from '../engine/errors.js';
 
@@ -29,19 +24,24 @@ marketRouter.get(
   '/status',
   asyncHandler(async (_req, res) => {
     const nowMs = Date.now();
-    const holidays = getHolidays();
-    const modeInfo = getEffectiveMode(nowMs, holidays, true);
-    const { virtualNowMs, sessionEpoch } = getVirtualTime(nowMs, modeInfo, env.REPLAY_SPEED);
+    const marketClock = getMarketClock(nowMs);
+    const { virtualNowMs, sessionEpoch, sessionDate } = marketClock;
+    const sources = Object.values(priceService.getDataSources());
+    const dataSource = sources.includes('db')
+      ? 'db'
+      : sources.includes('snapshot')
+        ? 'snapshot'
+        : 'synthetic';
 
     res.json({
-      mode: modeInfo.mode,
-      effectiveMode: modeInfo.effectiveMode ?? modeInfo.mode,
-      reason: modeInfo.reason,
-      sessionDate: modeInfo.sessionDate,
+      mode: marketClock.mode,
+      effectiveMode: marketClock.effectiveMode ?? marketClock.mode,
+      reason: marketClock.reason,
+      sessionDate,
       virtualNowMs,
-      speed: env.REPLAY_SPEED,
+      speed: marketClock.speed ?? env.REPLAY_SPEED,
       sessionEpoch,
-      dataSource: 'snapshot', // updated by price service
+      dataSource,
       delayMinutes: env.LIVE_DELAY_MINUTES,
       disclaimer: 'Simulation only. Virtual money. Not financial advice.',
     });
@@ -124,11 +124,8 @@ marketRouter.get(
     }
 
     const nowMs = Date.now();
+    const { virtualNowMs, sessionDate } = getMarketClock(nowMs);
     const holidays = getHolidays();
-    const modeInfo = getEffectiveMode(nowMs, holidays, true);
-    const { virtualNowMs } = getVirtualTime(nowMs, modeInfo, env.REPLAY_SPEED);
-
-    const { sessionDate } = modeInfo;
     const openMs = sessionOpenMs(sessionDate);
 
     // Current virtual minute index
