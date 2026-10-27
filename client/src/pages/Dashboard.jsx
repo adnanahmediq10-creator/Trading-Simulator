@@ -30,7 +30,7 @@ function DashboardContent() {
   const [prefillSide, setPrefillSide] = useState(null);
   const [prefillQty, setPrefillQty] = useState('');
   const { getTick } = useTicks();
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
   const qc = useQueryClient();
   const toast = useToast();
 
@@ -41,7 +41,10 @@ function DashboardContent() {
     queryKey: ['candles', symbol, chartInterval],
     queryFn: () => api.candles(symbol, chartInterval, 500),
     staleTime: 30_000,
-    refetchInterval: chartInterval === '1m' ? false : 60_000,
+    // Live ticks keep the chart smooth; polling lets it recover if a mobile or
+    // remote network drops the socket connection. The API uses the same clock
+    // as the tick stream, so these refreshes cannot move the chart backwards.
+    refetchInterval: connected ? 15_000 : 5_000,
     enabled: !!symbol,
   });
 
