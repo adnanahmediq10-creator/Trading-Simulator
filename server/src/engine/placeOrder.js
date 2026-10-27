@@ -7,7 +7,7 @@
  *  3. Instrument & price checks
  *  4. MARKET: atomic conditional debit + immediate fill
  *  5. LIMIT:  atomic conditional reserve + insert PENDING
- *  6. Evaluate PENDING against latest price (marketable limit fills immediately)
+ *  6. Register PENDING limits with current quote as their crossing baseline
  */
 import mongoose from 'mongoose';
 import { z } from 'zod';

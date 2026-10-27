@@ -209,7 +209,7 @@ Yahoo Finance blocks or rate-limits programmatic access. Replaying committed can
 When `sessionEpoch` changes (session loop wrap or mode switch), the matcher skips the **first tick** of the new epoch for all symbols. This prevents fills caused by the artificial price jump between one session's close and the next open, which would not represent a genuine market crossing.
 
 ### Fill-Price Rule
-Limit orders fill at the **triggering tick's price** (always equal to or better than the limit). Market orders fill at the latest tick. This is documented in the order ticket and means BUY limits get price improvement when the tick is below the limit, and SELL limits when the tick is above.
+Limit orders fill only after a fresh post-placement crossing: BUY fills when price falls from above the limit to it or below; SELL fills when price rises from below the limit to it or above. If the market is already past the target when an order is placed, it waits for a fresh crossing. Fills use the triggering tick's price, which is equal to or better than the limit. Market orders fill at the latest tick.
 
 ### Single-Instance Matcher
 The in-memory matcher works correctly on a single process. Horizontal scaling (multiple instances) would require moving the matcher to a leader-elected worker or a message queue. This is documented as a known limitation.

@@ -573,7 +573,7 @@ describe('Order Engine Integration Tests', () => {
     }
   });
 
-  it('Marketable LIMIT fills immediately via evaluateOrder', async () => {
+  it('LIMIT waits for a fresh crossing after registration', async () => {
     const user = await createUser();
     const { order } = await placeOrder({
       userId: String(user._id),
@@ -583,10 +583,14 @@ describe('Order Engine Integration Tests', () => {
       vts: Date.now(),
     });
     expect(order.status).toBe('PENDING');
-    await matcher.evaluateOrder(order, PRICE, Date.now());
+    const now = Date.now();
+    await matcher.registerOrder(order, PRICE);
+    await matcher.onTick(SYMBOL, PRICE + 500, now + 1);
+    expect((await Order.findById(order._id)).status).toBe('PENDING');
+    await matcher.onTick(SYMBOL, PRICE - 5, now + 2);
     const filled = await Order.findById(order._id);
     expect(filled.status).toBe('FILLED');
-    expect(filled.filledPricePaise).toBe(PRICE);
+    expect(filled.filledPricePaise).toBe(PRICE - 5);
   });
 
   it('Session-restart guard: first tick after restart does not fill', async () => {
@@ -600,9 +604,12 @@ describe('Order Engine Integration Tests', () => {
     });
     await matcher.rebuild();
     matcher.markSessionRestart();
-    await matcher.onTick(SYMBOL, PRICE - 500, Date.now());
+    const now = Date.now();
+    await matcher.onTick(SYMBOL, PRICE - 500, now);
     expect((await Order.findById(order._id)).status).toBe('PENDING');
-    await matcher.onTick(SYMBOL, PRICE - 500, Date.now());
+    await matcher.onTick(SYMBOL, PRICE + 500, now + 1);
+    expect((await Order.findById(order._id)).status).toBe('PENDING');
+    await matcher.onTick(SYMBOL, PRICE - 500, now + 2);
     expect((await Order.findById(order._id)).status).toBe('FILLED');
   });
 
@@ -619,7 +626,12 @@ describe('Order Engine Integration Tests', () => {
     matcher._pendingCount = 0;
     await matcher.rebuild();
     expect(matcher.size()).toBeGreaterThan(0);
-    await matcher.onTick(SYMBOL, PRICE, Date.now());
+    const now = Date.now();
+    matcher.markSessionRestart();
+    await matcher.onTick(SYMBOL, PRICE, now);
+    await matcher.onTick(SYMBOL, PRICE + 500, now + 1);
+    expect((await Order.findById(order._id)).status).toBe('PENDING');
+    await matcher.onTick(SYMBOL, PRICE - 5, now + 2);
     expect((await Order.findById(order._id)).status).toBe('FILLED');
   });
 

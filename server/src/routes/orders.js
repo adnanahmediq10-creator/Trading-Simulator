@@ -53,10 +53,10 @@ ordersRouter.post(
       io,
     });
 
-    // Register PENDING LIMIT with matcher and evaluate immediately
+    // Register PENDING LIMIT with its current price as the crossing baseline.
     if (order.status === 'PENDING' && order.type === 'LIMIT') {
       const latest = priceService.getLatest(order.symbol);
-      await matcher.evaluateOrder(order, latest?.pricePaise, latest?.vts);
+      await matcher.registerOrder(order, latest?.pricePaise);
     }
 
     if (idempotent) {

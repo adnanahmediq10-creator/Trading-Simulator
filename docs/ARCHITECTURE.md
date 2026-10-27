@@ -151,8 +151,8 @@ priceService emits 'ticks' every second
    → matcher.onTick(symbol, tickPrice, vts)
       per-symbol promise queue (sequential)
       for each PENDING LIMIT in time priority:
-         BUY: fill if tickPrice <= limitPrice
-         SELL: fill if tickPrice >= limitPrice
+         BUY: fill when price crosses down from above the limit
+         SELL: fill when price crosses up from below the limit
          → executeFill(orderId, tickPrice, vts)
             BEGIN TRANSACTION
             findOneAndUpdate {_id, status:'PENDING'} → {FILLED}  ← atomic claim

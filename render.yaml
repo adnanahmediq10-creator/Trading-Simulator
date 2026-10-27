@@ -38,7 +38,7 @@ services:
         value: "100000000"
 
       - key: REPLAY_SPEED
-        value: "30"
+        value: "2"
 
       - key: LIVE_DELAY_MINUTES
         value: "15"

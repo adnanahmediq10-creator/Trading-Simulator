@@ -22,6 +22,10 @@ class Matcher {
   constructor() {
     /** @type {Map<string, { buys: PendingOrder[], sells: PendingOrder[] }>} */
     this._index = new Map();
+    /** @type {Map<string, number>} last observed price for each pending order */
+    this._lastPriceByOrder = new Map();
+    /** @type {Set<string>} orders already triggered and awaiting a successful fill */
+    this._triggeredOrders = new Set();
     /** @type {Map<string, Promise>} symbol → current processing promise */
     this._queues = new Map();
     /** @type {Set<string>} symbols awaiting first-tick-skip after session restart */
@@ -47,6 +51,8 @@ class Matcher {
    */
   async rebuild() {
     this._index.clear();
+    this._lastPriceByOrder.clear();
+    this._triggeredOrders.clear();
     this._pendingCount = 0;
     const pending = await Order.find({ status: 'PENDING', type: 'LIMIT' })
       .sort({ createdAt: 1 })
@@ -59,21 +65,14 @@ class Matcher {
   }
 
   /**
-   * Register a newly placed PENDING order and evaluate it immediately
-   * against the latest tick (marketable limits fill right away).
-   * Immediate evaluation is not subject to the session-restart skip.
+   * Register a newly placed PENDING order and use the current quote as its
+   * baseline. It can fill only after a later tick crosses the limit.
    * @param {object} order
    * @param {number} [tickPrice]
-   * @param {number} [vts]
    */
-  async evaluateOrder(order, tickPrice, vts) {
+  async registerOrder(order, tickPrice) {
     this._addToIndex(order);
-    if (tickPrice == null) return;
-    const shouldFill =
-      (order.side === 'BUY' && tickPrice <= order.limitPricePaise) ||
-      (order.side === 'SELL' && tickPrice >= order.limitPricePaise);
-    if (!shouldFill) return;
-    await this._processTick(order.symbol, tickPrice, vts ?? Date.now(), { ignoreSkip: true });
+    if (tickPrice != null) this._lastPriceByOrder.set(String(order._id), tickPrice);
   }
 
   /**
@@ -88,6 +87,8 @@ class Matcher {
     const initialSells = bucket.sells.length;
     bucket.buys = bucket.buys.filter((o) => String(o._id) !== String(orderId));
     bucket.sells = bucket.sells.filter((o) => String(o._id) !== String(orderId));
+    this._lastPriceByOrder.delete(String(orderId));
+    this._triggeredOrders.delete(String(orderId));
     const removed = (initialBuys - bucket.buys.length) + (initialSells - bucket.sells.length);
     this._pendingCount -= removed;
   }
@@ -169,31 +170,45 @@ class Matcher {
   }
 
   /**
-   * Process a price tick for a symbol: trigger eligible fills in time priority.
+   * Process a market tick and fill orders only when their target is crossed.
    * @param {string} symbol
    * @param {number} pricePaise
    * @param {number} vts
    */
-  /**
-   * @param {string} symbol
-   * @param {number} pricePaise
-   * @param {number} vts
-   * @param {{ ignoreSkip?: boolean }} [opts]
-   */
-  async _processTick(symbol, pricePaise, vts, opts = {}) {
+  async _processTick(symbol, pricePaise, vts) {
+    const bucket = this._index.get(symbol);
+
     // Session-restart guard: skip first ticker tick of a new epoch
-    if (!opts.ignoreSkip && this._skipNext.has(symbol)) {
+    if (this._skipNext.has(symbol)) {
       this._skipNext.delete(symbol);
+      for (const order of [...(bucket?.buys ?? []), ...(bucket?.sells ?? [])]) {
+        const id = String(order._id);
+        this._lastPriceByOrder.set(id, pricePaise);
+        this._triggeredOrders.delete(id);
+      }
       return;
     }
 
-    const bucket = this._index.get(symbol);
     if (!bucket) return;
 
-    // BUY fills: tick price ≤ limit price
-    const triggeredBuys = bucket.buys.filter((o) => pricePaise <= o.limitPricePaise);
-    // SELL fills: tick price ≥ limit price
-    const triggeredSells = bucket.sells.filter((o) => pricePaise >= o.limitPricePaise);
+    // A limit order activates only on a fresh crossing after it was placed.
+    // BUY: price falls from above the limit to the limit or below.
+    // SELL: price rises from below the limit to the limit or above.
+    const crossed = (orders, side) => orders.filter((order) => {
+      const id = String(order._id);
+      if (this._triggeredOrders.has(id)) return true;
+      const previousPrice = this._lastPriceByOrder.get(id);
+      this._lastPriceByOrder.set(id, pricePaise);
+      if (previousPrice == null) return false;
+      const didCross = side === 'BUY'
+        ? previousPrice > order.limitPricePaise && pricePaise <= order.limitPricePaise
+        : previousPrice < order.limitPricePaise && pricePaise >= order.limitPricePaise;
+      if (didCross) this._triggeredOrders.add(id);
+      return didCross;
+    });
+
+    const triggeredBuys = crossed(bucket.buys, 'BUY');
+    const triggeredSells = crossed(bucket.sells, 'SELL');
 
     for (const order of [...triggeredBuys, ...triggeredSells]) {
       try {

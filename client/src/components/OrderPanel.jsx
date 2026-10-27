@@ -1,7 +1,7 @@
 /**
  * OrderPanel — place MARKET or LIMIT orders.
  *   MARKET  → executes immediately at current best price
- *   LIMIT   → queued; auto-executes when market price touches your target price
+ *   LIMIT   → queued; triggers when price crosses the target after placement
  *
  * Props: { symbol, pricePaise, onSuccess, prefillSide, prefillQty, onPrefillConsumed }
  */
@@ -15,7 +15,7 @@ import { useToast } from './Toasts.jsx';
 
 const ORDER_TYPES = [
   { value: 'MARKET', label: 'Market', sublabel: 'Instant fill' },
-  { value: 'LIMIT',  label: 'Limit',  sublabel: 'Auto at price' },
+  { value: 'LIMIT',  label: 'Limit',  sublabel: 'On target crossing' },
 ];
 
 export default function OrderPanel({ symbol, pricePaise, onSuccess, prefillSide, prefillQty, onPrefillConsumed }) {
@@ -53,7 +53,7 @@ export default function OrderPanel({ symbol, pricePaise, onSuccess, prefillSide,
     onSuccess: (data) => {
       const o = data.order;
       const msg = o.type === 'LIMIT'
-        ? `Limit ${o.side} ${o.qty} ${o.symbol} queued at ${formatINR(o.limitPricePaise)} — will auto-fill when price hits`
+        ? `Limit ${o.side} ${o.qty} ${o.symbol} queued at ${formatINR(o.limitPricePaise)} — waits for a fresh target crossing`
         : `${o.side} ${o.qty} ${o.symbol} — ${o.status}`;
       toast(msg, 'success');
       setQty('');
@@ -161,7 +161,7 @@ export default function OrderPanel({ symbol, pricePaise, onSuccess, prefillSide,
       {/* Limit info banner */}
       {type === 'LIMIT' && (
         <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg px-3 py-2 text-[11px] text-amber-300/80 leading-relaxed">
-          ⚡ Order queues on the book. Auto-executes the moment market price touches your limit — no action needed.
+          ⚡ The order waits for price to cross your target after placement. If price is already past the target, it must move back across before the order fills.
         </div>
       )}
 
@@ -188,7 +188,7 @@ export default function OrderPanel({ symbol, pricePaise, onSuccess, prefillSide,
           <div>
             <label className="text-xs text-gray-400 mb-1.5 block font-medium">
               Target Price (₹)
-              <span className="ml-2 text-gray-600 font-normal">— auto-fills when hit</span>
+              <span className="ml-2 text-gray-600 font-normal">— waits for a fresh crossing</span>
             </label>
             <input
               id="order-limit-price"

@@ -19,7 +19,9 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   STARTING_CASH_PAISE: z.coerce.number().int().positive().default(100_000_000),
-  REPLAY_SPEED: z.coerce.number().int().min(1).max(60).default(30),
+  // Keep demo replay paced for human viewing even if an old deployment still
+  // has a higher REPLAY_SPEED environment value configured.
+  REPLAY_SPEED: z.coerce.number().int().min(1).max(60).default(2).transform((speed) => Math.min(speed, 2)),
   LIVE_DELAY_MINUTES: z.coerce.number().int().min(0).default(15),
   STALE_AFTER_MS: z.coerce.number().int().positive().default(30_000),
   INGEST_ENABLED: z
